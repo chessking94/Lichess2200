@@ -31,7 +31,7 @@ def main():
     # create lichess2000 file
     dte1 = dt.datetime.now().strftime('%H:%M:%S')
     print('Lichess2000 pgn creation started at ' + dte1)
-    tag_file = r'C:\Users\eehunt\Documents\Chess\Scripts\LichessPgnTags.txt'
+    tag_file = r'C:\Users\eehunt\Repository\Lichess2000\LichessPgnTags.txt'
     pgn_name = 'lichess2000_' + yyyy + mm + '.pgn'
     cmd_text = 'pgn-extract -C -N -V -D -pl2 -t"' + tag_file + '" --quiet --fixresulttags --fixtagstrings --nosetuptags --output ' + pgn_name + ' ' + extracted_file
     os.system('cmd /C ' + cmd_text)
