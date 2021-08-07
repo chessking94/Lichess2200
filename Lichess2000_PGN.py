@@ -21,14 +21,15 @@ def main():
     decomp_start = dt.datetime.now().strftime('%H:%M:%S')
     print('Decompression started at ' + decomp_start)
     cmd_text = '7z e ' +  file_name
-    os.chdir(file_path)
+    if os.getcwd != file_path:
+        os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
     decomp_end = dt.datetime.now().strftime('%H:%M:%S')
     print('Decompression ended at ' + decomp_end)
     extracted_file = file_name.replace('.bz2', '')
 
     # if file is already extracted, specify here
-    # extracted_file = 'lichess_db_standard_rated_2021-02.pgn'
+    #extracted_file = 'lichess_db_standard_rated_2021-03.pgn'
     
     # create error log
     error_start = dt.datetime.now().strftime('%H:%M:%S')
@@ -50,7 +51,8 @@ def main():
     pgn_name = 'lichess2000_' + yyyy + mm + '.pgn'
     cmd_text = 'pgn-extract -C -N -V -D -pl2 -t"' + tag_file + '" --quiet --fixresulttags --fixtagstrings --nosetuptags --output ' + pgn_name + ' ' + extracted_file
     if os.getcwd() != file_path:
-        os.system('cmd /C ' + cmd_text)
+        os.chdir(file_path)
+    os.system('cmd /C ' + cmd_text)
     pgn_end = dt.datetime.now().strftime('%H:%M:%S')
     print('Lichess2000 pgn creation ended at ' + pgn_end)
 
