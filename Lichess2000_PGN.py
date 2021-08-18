@@ -1,4 +1,5 @@
 import os
+import fileinput
 import datetime as dt
 
 def main():
@@ -44,12 +45,33 @@ def main():
     error_end = dt.datetime.now().strftime('%H:%M:%S')
     print('Error log creation ended at ' + error_end)
 
-    # create lichess2000 file
+    # create 2000+ rating file
     pgn_start = dt.datetime.now().strftime('%H:%M:%S')
     print('Lichess2000 pgn creation started at ' + pgn_start)
     tag_file = r'C:\Users\eehunt\Repository\Lichess2000\LichessPgnTags.txt'
-    pgn_name = 'lichess2000_' + yyyy + mm + '.pgn'
+    pgn_name = 'lichess2000all_' + yyyy + mm + '.pgn'
     cmd_text = 'pgn-extract -C -N -V -D -pl2 -t"' + tag_file + '" --quiet --fixresulttags --fixtagstrings --nosetuptags --output ' + pgn_name + ' ' + extracted_file
+    if os.getcwd() != file_path:
+        os.chdir(file_path)
+    os.system('cmd /C ' + cmd_text)
+
+    # update correspondence game TimeControl tag
+    new_pgn_name = 'lichess2000fixed_' + yyyy + mm + '.pgn'
+    ofile = os.path.join(file_path, pgn_name)
+    nfile = os.path.join(file_path, new_pgn_name)
+    searchExp = '[TimeControl "-"]\n'
+    replaceExp = '[TimeControl "1/86400"]\n'
+    wfile = open(nfile, 'w')
+    for line in fileinput.input(ofile, inplace=1):
+        if searchExp in line:
+            line = line.replace(searchExp, replaceExp)
+        wfile.write(line)
+    wfile.close()
+
+    # rerun pgn-extract to leave all non-bullet games
+    tag_file = r'C:\Users\eehunt\Repository\Lichess2000\LichessNoBulletTag.txt'
+    pgn_name = 'lichess2000_' + yyyy + mm + '.pgn'
+    cmd_text = 'pgn-extract -t"' + tag_file + '" --quiet --output ' + pgn_name + ' ' + new_pgn_name
     if os.getcwd() != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -59,10 +81,26 @@ def main():
     # delete old files
     fname_relpath = os.path.join(file_path, extracted_file)
     os.remove(fname_relpath)
+    os.remove(ofile)
+    os.remove(nfile)
 
-    # write to log file
+    # write to log files
+    # timing
     with open(log_file, 'a') as f:
         f.write(extracted_file + '\t' + start_date + '\t' + decomp_start + '\t' + decomp_end + '\t' + error_start + '\t' + error_end + '\t' + pgn_start + '\t' + pgn_end +'\n')
+    f.close()
+
+    # game count
+    log_counts = r'D:\eehunt\LONGTERM\Chess\LichessPGN\Game_Counts.txt'
+    search_text = '[Event "'
+    ct = 0
+    with open(os.path.join(file_path, pgn_name), 'r') as f:
+        for line in f:
+            if search_text in line:
+                ct = ct + 1
+        with open(log_counts, 'a') as lf:
+            lf.write(pgn_name + '\t' + str(ct) + '\n')
+        lf.close()
     f.close()
 
     end_time = dt.datetime.now().strftime('%H:%M:%S')
