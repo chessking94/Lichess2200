@@ -7,7 +7,7 @@ def main():
     print("Process started at " + start_time)
     log_file = r'D:\eehunt\LONGTERM\Chess\LichessPGN\File_Processing_Log.txt'
     file_path = r'D:\eehunt\LONGTERM\Chess\LichessPGN\2021'
-    file_name = 'lichess_db_standard_rated_2021-07.pgn.bz2'
+    file_name = 'lichess_db_standard_rated_2021-08.pgn.bz2'
 
     # set default values, if I want to mess around and only skip certain steps
     start_date = dt.datetime.now().strftime('%Y-%m-%d')
@@ -45,9 +45,9 @@ def main():
     error_end = dt.datetime.now().strftime('%H:%M:%S')
     print('Error log creation ended at ' + error_end)
 
-    # create 2000+ rating file
+    # create 2200+ rating file
     pgn_start = dt.datetime.now().strftime('%H:%M:%S')
-    print('Lichess2000 pgn creation started at ' + pgn_start)
+    print('Lichess2200 pgn creation started at ' + pgn_start)
     tag_file = r'C:\Users\eehunt\Repository\Lichess2000\LichessPgnTags.txt'
     pgn_name = 'lichess2000all_' + yyyy + mm + '.pgn'
     cmd_text = 'pgn-extract -C -N -V -D -pl2 -t"' + tag_file + '" --quiet --fixresulttags --fixtagstrings --nosetuptags --output ' + pgn_name + ' ' + extracted_file
@@ -56,7 +56,7 @@ def main():
     os.system('cmd /C ' + cmd_text)
 
     # update correspondence game TimeControl tag
-    new_pgn_name = 'lichess2000fixed_' + yyyy + mm + '.pgn'
+    new_pgn_name = 'lichess2200fixed_' + yyyy + mm + '.pgn'
     ofile = os.path.join(file_path, pgn_name)
     nfile = os.path.join(file_path, new_pgn_name)
     searchExp = '[TimeControl "-"]\n'
@@ -70,13 +70,13 @@ def main():
 
     # rerun pgn-extract to leave all non-bullet games
     tag_file = r'C:\Users\eehunt\Repository\Lichess2000\LichessNoBulletTag.txt'
-    pgn_name = 'lichess2000_' + yyyy + mm + '.pgn'
+    pgn_name = 'lichess2200_' + yyyy + mm + '.pgn'
     cmd_text = 'pgn-extract -t"' + tag_file + '" --quiet --output ' + pgn_name + ' ' + new_pgn_name
     if os.getcwd() != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
     pgn_end = dt.datetime.now().strftime('%H:%M:%S')
-    print('Lichess2000 pgn creation ended at ' + pgn_end)
+    print('Lichess2200 pgn creation ended at ' + pgn_end)
 
     # delete old files
     fname_relpath = os.path.join(file_path, extracted_file)
@@ -105,6 +105,7 @@ def main():
 
     end_time = dt.datetime.now().strftime('%H:%M:%S')
     print("Process ended at " + end_time)
+
 
 if __name__ == '__main__':
     main()

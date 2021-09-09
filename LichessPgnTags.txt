@@ -1,2 +1,2 @@
-WhiteElo >= "2000"
-BlackElo >= "2000"
+WhiteElo >= "2200"
+BlackElo >= "2200"
