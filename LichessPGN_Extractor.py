@@ -76,7 +76,7 @@ def main():
     )
 
     logging.info('Process started')
-    log_file = r'D:\eehunt\LONGTERM\Chess\LichessPGN\Summary_Log.txt'
+    log_file = r'D:\eehunt\LONGTERM\Chess\LichessPGN\LichessPGN_Log.txt'
     file_path = r'D:\eehunt\LONGTERM\Chess\LichessPGN\2022'
     file_name = 'lichess_db_standard_rated_2022-08.pgn.bz2'
 
@@ -173,16 +173,14 @@ def main():
     # separate into time control files
     i = 0
     tc_files = []
-    tc_options = ['Bullet', 'Blitz', 'Rapid', 'Classical', 'Correspondence']
-    tc_min_list = ['60', '180', '601', '1800', '86400']
-    tc_max_list = ['179', '600', '1799', '86399', '1209600']
+    tc_options = ['Bullet', 'Blitz', 'Rapid', 'Classical']
+    tc_min_list = ['60', '180', '601', '1800']
+    tc_max_list = ['179', '600', '1799', '86399']
     for tc_type in tc_options:
         logging.info(f'{tc_type} extract started')
         tc_min = tc_min_list[i]
         tc_max = tc_max_list[i]
         new_tc_name = 'lichess2200_' + yyyy + mm + '_' + tc_type + '.pgn'
-        if tc_type != 'Correspondence':
-            tc_files.append(new_tc_name) 
 
         # create time control tag files
         tc_tag_file_min = 'TimeControlTagMin.txt'
@@ -264,6 +262,7 @@ def main():
     full_pgn = os.path.join(file_path, new_name)
     completed_file = f'{os.path.splitext(new_name)[0]}_Completed.pgn'
     completed_full = os.path.join(file_path, completed_file)
+    comp_ct = 0
     with open(full_pgn, 'r') as pgn:
         ctr = 0
         game_text = chess.pgn.read_game(pgn)
@@ -283,6 +282,7 @@ def main():
                     conn.commit()
                     ctr = ctr + 1
             else:
+                comp_ct = comp_ct + 1
                 with open(completed_full, 'a', encoding='utf-8') as f:
                     f.write(str(game_text) + '\n\n')
 
@@ -299,6 +299,7 @@ def main():
     os.remove(os.path.join(file_path, extracted_file))
     os.remove(os.path.join(file_path, upd_name))
     os.remove(os.path.join(file_path, pgn_name))
+    # os.remove(os.path.join(file_path, new_name))
     if bad_dates:
         os.remove(nfile2)
         os.remove(os.path.join(file_path, corr_name))
@@ -328,7 +329,10 @@ def main():
                         if search_text in line:
                             ct = ct + 1
             f.write('\t' + str(ct))
-        f.write('\n')
+        
+        # corr count
+        f.write('\t' + str(comp_ct))
+        # f.write('\n')
     logging.info('Counting games ended')
 
     # review for recently completed correspondence games
@@ -351,8 +355,8 @@ def main():
 SELECT TOP 300
 GameID
 FROM OngoingLichessCorr
-WHERE (DATEDIFF(DAY, ISNULL(LastReviewed, '2022-08-01'), GETDATE()) >= 7 AND Inactive = 0)
-OR (DATEDIFF(DAY, ISNULL(LastReviewed, '2022-08-01'), GETDATE()) >= 90 AND Inactive = 1)
+WHERE (Inactive = 0 AND (LastReviewed IS NULL OR DATEDIFF(DAY, LastReviewed, GETDATE()) >= 7))
+OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
     """
     game_rec = pd.read_sql(game_qry, conn).values.tolist()
     game_list = [j for sub in game_rec for j in sub]
@@ -464,6 +468,8 @@ OR (DATEDIFF(DAY, ISNULL(LastReviewed, '2022-08-01'), GETDATE()) >= 90 AND Inact
         ctr = ctr + 1
     
     conn.close()
+    with open(log_file, 'a') as f:
+        f.write('\t' + str(running_total) + '\n') # count of newly completed games
     logging.info('Download for recently completed correspondence games ended')
 
     # verify files were downloaded before continuing
