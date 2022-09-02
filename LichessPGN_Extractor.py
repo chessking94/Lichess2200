@@ -11,23 +11,12 @@ import pandas as pd
 import pyodbc as sql
 import requests
 
-def get_connstr():
-    # get SQL Server connection string from private file
-    fpath = r'C:\Users\eehunt\Repository'
-    fname = 'confidential.json'
-    with open(os.path.join(fpath, fname), 'r') as t:
+def get_conf(key):
+    fname = r'C:\Users\eehunt\Repository\confidential.json'
+    with open(fname, 'r') as t:
         key_data = json.load(t)
-    conn_str = key_data.get('SqlServerConnectionStringTrusted')
-    return conn_str
-
-def get_lichesstoken():
-    # get Lichess API token from private file
-    fpath = r'C:\Users\eehunt\Repository'
-    fname = 'confidential.json'
-    with open(os.path.join(fpath, fname), 'r') as t:
-        key_data = json.load(t)
-    token_value = key_data.get('LichessAPIToken')
-    return token_value
+    val = key_data.get(key)
+    return val
 
 def format_date(game_text, tag):
     tag_text = game_text.headers.get(tag)
@@ -61,7 +50,7 @@ def main():
     # initiate
     dte = dt.datetime.now().strftime('%Y%m%d%H%M%S')
     scr_nm = os.path.splitext(os.path.basename(__file__))[0]
-    log_path = os.path.join(os.getcwd(), 'logs')
+    log_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'logs')
     if not os.path.isdir(log_path):
         os.mkdir(log_path)
     log_name = scr_nm + '_' + dte + '.log'
@@ -208,6 +197,7 @@ def main():
             os.chdir(file_path)
         os.system('cmd /C ' + cmd_text)
 
+        tc_files.append(new_tc_name)
         i = i + 1
         os.remove(os.path.join(file_path, tmp_file))
         os.remove(tc_tag_file_min_full)
@@ -255,7 +245,7 @@ def main():
         os.rename(os.path.join(file_path, corr_name), os.path.join(file_path, new_name))
 
     logging.info('Review for ongoing correspondence games started')
-    conn_str = get_connstr()
+    conn_str = get_conf('SqlServerConnectionStringTrusted')
     conn = sql.connect(conn_str)
     csr = conn.cursor()
 
@@ -288,7 +278,7 @@ def main():
 
             game_text = chess.pgn.read_game(pgn)
     
-    tc_files.append(completed_file) 
+    tc_files.append(completed_file)
     conn.close()
     logging.info(f'Total of {ctr} ongoing correspondence games')
     logging.info('Review for ongoing correspondence games ended')
@@ -299,7 +289,7 @@ def main():
     os.remove(os.path.join(file_path, extracted_file))
     os.remove(os.path.join(file_path, upd_name))
     os.remove(os.path.join(file_path, pgn_name))
-    # os.remove(os.path.join(file_path, new_name))
+    os.remove(os.path.join(file_path, new_name))
     if bad_dates:
         os.remove(nfile2)
         os.remove(os.path.join(file_path, corr_name))
@@ -338,7 +328,7 @@ def main():
     # review for recently completed correspondence games
     conn = sql.connect(conn_str)
     csr = conn.cursor()
-    token_value = get_lichesstoken()
+    token_value = get_conf('LichessAPIToken')
     game_url = 'https://lichess.org/api/games/export/_ids'
     hdr_json = {'Authorization': 'Bearer ' + token_value, 'Accept': 'application/x-ndjson'}
     hdr_pgn = {'Authorization': 'Bearer ' + token_value, 'Accept': 'application/x-chess-pgn'}
