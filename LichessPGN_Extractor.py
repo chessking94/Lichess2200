@@ -265,7 +265,7 @@ def main():
                 gm_ct = len(gmlist)
                 sql_cmd = ''
                 if gm_ct == 0:
-                    sql_cmd = f"INSERT INTO OngoingLichessCorr (GameID, Filename, Download, Inactive) VALUES ('{gameid}', '{pgn_name}', 0, 0)"
+                    sql_cmd = f"INSERT INTO OngoingLichessCorr (GameID, Filename, Download, Inactive) VALUES ('{gameid}', '{new_name}', 0, 0)"
                 if sql_cmd != '':
                     logging.debug(sql_cmd)
                     csr.execute(sql_cmd)
