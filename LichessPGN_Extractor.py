@@ -11,6 +11,7 @@ import pandas as pd
 import pyodbc as sql
 import requests
 
+
 def get_conf(key):
     fname = r'C:\Users\eehunt\Repository\confidential.json'
     with open(fname, 'r') as t:
@@ -18,13 +19,15 @@ def get_conf(key):
     val = key_data.get(key)
     return val
 
+
 def format_date(game_text, tag):
     tag_text = game_text.headers.get(tag)
     if tag_text is None:
         tag_text = game_text.headers.get('Date')
 
     return tag_text
-    
+
+
 def format_result(game_text, tag):
     tag_text = game_text.headers.get(tag)
     # res_len = 3
@@ -37,14 +40,16 @@ def format_result(game_text, tag):
             res = '0.0'
         elif tag_text == '1/2-1/2':
             res = '0.5'
-    
+
     return res
+
 
 def format_source_id(game_text, tag):
     tag_text = game_text.headers.get(tag)
     site_id = tag_text.split('/')[-1] if tag_text is not None else None
-    
+
     return site_id
+
 
 def main():
     # initiate
@@ -82,22 +87,22 @@ def main():
     # decompress file
     decomp_start = dt.datetime.now().strftime('%H:%M:%S')
     logging.info('Decompression started')
-    cmd_text = '7z e ' +  file_name
+    cmd_text = '7z e ' + file_name
     if os.getcwd != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
     decomp_end = dt.datetime.now().strftime('%H:%M:%S')
     logging.info('Decompression ended')
     extracted_file = file_name.replace('.bz2', '')
-    
+
     yyyy = extracted_file[26:30]
     mm = extracted_file[31:33]
 
     # create error log
     error_start = dt.datetime.now().strftime('%H:%M:%S')
     logging.info('Error log started')
-    error_file = 'lichess_' + yyyy + mm + '_errors.log'
-    cmd_text = 'pgn-extract --quiet -r -l' + error_file + ' ' + extracted_file
+    error_file = f'lichess_{yyyy}{mm}_errors.log'
+    cmd_text = f'pgn-extract --quiet -r -l{error_file} {extracted_file}'
     if os.getcwd != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -108,7 +113,7 @@ def main():
 
     # update correspondence game TimeControl tag
     logging.info('Correspondence TimeControl tag update started')
-    upd_name = 'lichess_tc_updated_' + yyyy + mm + '.pgn'
+    upd_name = f'lichess_tc_updated_{yyyy}{mm}.pgn'
     ofile = os.path.join(file_path, extracted_file)
     nfile = os.path.join(file_path, upd_name)
     searchExp = '[TimeControl "-"]\n'
@@ -124,8 +129,8 @@ def main():
     # extract only 2200+ rating games
     logging.info('2200+ game extract started')
     tag_file = r'C:\Users\eehunt\Repository\Lichess2200\LichessPgnTags.txt'
-    pgn_name = 'lichess2200all_' + yyyy + mm + '.pgn'
-    cmd_text = 'pgn-extract -N -V -D -pl2 -t"' + tag_file + '" --quiet --fixresulttags --fixtagstrings --nosetuptags --output ' + pgn_name + ' ' + upd_name
+    pgn_name = f'lichess2200all_{yyyy}{mm}.pgn'
+    cmd_text = f'pgn-extract -N -V -D -pl2 -t"{tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags --output {pgn_name} {upd_name}'
     if os.getcwd() != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -136,7 +141,7 @@ def main():
     if int(yyyy + mm) <= 201803:
         logging.info(f'Filedate is {yyyy}{mm}, Date tag update started')
         bad_dates = 1
-        new_pgn_name_2 = 'lichess2200allfixed_' + yyyy + mm + '.pgn'
+        new_pgn_name_2 = f'lichess2200allfixed_{yyyy}{mm}.pgn'
         nfile2 = os.path.join(file_path, new_pgn_name_2)
         searchExp1 = '[Date "????.??.??"]\n'
         replaceExp1 = ''
@@ -153,7 +158,7 @@ def main():
             wfile.write(line)
         wfile.close()
         logging.info(f'Filedate is {yyyy}{mm}, Date tag update ended')
-    
+
     if bad_dates:
         curr_name = new_pgn_name_2
     else:
@@ -169,30 +174,30 @@ def main():
         logging.info(f'{tc_type} extract started')
         tc_min = tc_min_list[i]
         tc_max = tc_max_list[i]
-        new_tc_name = 'lichess2200_' + yyyy + mm + '_' + tc_type + '.pgn'
+        new_tc_name = f'lichess2200_{yyyy}{mm}_{tc_type}.pgn'
 
         # create time control tag files
         tc_tag_file_min = 'TimeControlTagMin.txt'
         tc_tag_file_min_full = os.path.join(file_path, tc_tag_file_min)
-        tc_txt = 'TimeControl >= "' + tc_min + '"'
+        tc_txt = f'TimeControl >= "{tc_min}"'
         with open(tc_tag_file_min_full, 'w') as mn:
             mn.write(tc_txt)
-        
+
         tc_tag_file_max = 'TimeControlTagMax.txt'
         tc_tag_file_max_full = os.path.join(file_path, tc_tag_file_max)
-        tc_txt = 'TimeControl <= "' + tc_max + '"'
+        tc_txt = f'TimeControl <= "{tc_max}"'
         with open(tc_tag_file_max_full, 'w') as mx:
             mx.write(tc_txt)
-    
+
         # filter min time control
-        tmp_file = 'temp' + tc_type + '_' + curr_name
-        cmd_text = 'pgn-extract --quiet -t' + tc_tag_file_min + ' --output ' + tmp_file + ' ' + curr_name
+        tmp_file = f'temp{tc_type}_{curr_name}'
+        cmd_text = f'pgn-extract --quiet -t{tc_tag_file_min} --output {tmp_file} {curr_name}'
         if os.getcwd != file_path:
             os.chdir(file_path)
         os.system('cmd /C ' + cmd_text)
 
         # filter max time control
-        cmd_text = 'pgn-extract --quiet -t' + tc_tag_file_max + ' --output ' + new_tc_name + ' ' + tmp_file
+        cmd_text = f'pgn-extract --quiet -t{tc_tag_file_max} --output {new_tc_name} {tmp_file}'
         if os.getcwd != file_path:
             os.chdir(file_path)
         os.system('cmd /C ' + cmd_text)
@@ -211,15 +216,15 @@ def main():
     logging.info('Complete correspondence game extract started')
     tag_file = r'C:\Users\eehunt\Repository\Lichess2200\LichessCorrTag.txt'
     minply = '6'
-    corr_name = 'lichess_correspondence_orig_' + yyyy + mm + '.pgn'
-    cmd_text = 'pgn-extract -N -V -D -s -pl' + minply + ' -t"' + tag_file + '" --quiet --fixresulttags --fixtagstrings --nosetuptags -o' + corr_name + ' ' + upd_name
+    corr_name = f'lichess_correspondence_orig_{yyyy}{mm}.pgn'
+    cmd_text = f'pgn-extract -N -V -D -s -pl{minply} -t"{tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags -o{corr_name} {upd_name}'
     if os.getcwd() != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
     logging.info('Complete correspondence game extract ended')
 
     # fix date tag if file is earlier than 201804
-    new_name = 'lichess_correspondence_' + yyyy + mm + '.pgn'
+    new_name = f'lichess_correspondence_{yyyy}{mm}.pgn'
     bad_dates = 0
     if int(yyyy + mm) <= 201803:
         logging.info(f'Filedate is {yyyy}{mm}, Date tag update started')
@@ -240,7 +245,7 @@ def main():
             wfile.write(line)
         wfile.close()
         logging.info(f'Filedate is {yyyy}{mm}, Date tag update ended')
-    
+
     if not bad_dates:
         os.rename(os.path.join(file_path, corr_name), os.path.join(file_path, new_name))
 
@@ -265,7 +270,8 @@ def main():
                 gm_ct = len(gmlist)
                 sql_cmd = ''
                 if gm_ct == 0:
-                    sql_cmd = f"INSERT INTO OngoingLichessCorr (GameID, Filename, Download, Inactive) VALUES ('{gameid}', '{new_name}', 0, 0)"
+                    sql_cmd = 'INSERT INTO OngoingLichessCorr (GameID, Filename, Download, Inactive) '
+                    sql_cmd = sql_cmd + f"VALUES ('{gameid}', '{new_name}', 0, 0)"
                 if sql_cmd != '':
                     logging.debug(sql_cmd)
                     csr.execute(sql_cmd)
@@ -277,7 +283,7 @@ def main():
                     f.write(str(game_text) + '\n\n')
 
             game_text = chess.pgn.read_game(pgn)
-    
+
     tc_files.append(completed_file)
     conn.close()
     logging.info(f'Total of {ctr} ongoing correspondence games')
@@ -319,7 +325,7 @@ def main():
                         if search_text in line:
                             ct = ct + 1
             f.write('\t' + str(ct))
-        
+
         # corr count
         f.write('\t' + str(comp_ct))
         # f.write('\n')
@@ -369,14 +375,18 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                             curr_status = g['status']
                             last_move = g['lastMoveAt']
                             if curr_status in completed_status:
-                                upd_qry = f"UPDATE OngoingLichessCorr SET Download = 1, LastMoveAtUnix = {last_move}, LastReviewed = GETDATE() WHERE GameID = '{game_id}'"
+                                upd_qry = 'UPDATE OngoingLichessCorr'
+                                upd_qry = upd_qry + f'SET Download = 1, LastMoveAtUnix = {last_move}, LastReviewed = GETDATE()'
+                                upd_qry = upd_qry + f"WHERE GameID = '{game_id}'"
                             else:
                                 # if no move has been played in at least 30 days, game is still considered ongoing. update to inactive
                                 if curr_unix - last_move > 2592000000:
                                     inact = '1'
                                 else:
                                     inact = '0'
-                                upd_qry = f"UPDATE OngoingLichessCorr SET LastMoveAtUnix = {last_move}, LastReviewed = GETDATE(), Inactive = {inact} WHERE GameID = '{game_id}'"
+                                upd_qry = 'UPDATE OngoingLichessCorr'
+                                upd_qry = upd_qry + f'SET LastMoveAtUnix = {last_move}, LastReviewed = GETDATE(), Inactive = {inact}'
+                                upd_qry = upd_qry + f"WHERE GameID = '{game_id}'"
 
                             if upd_qry != '':
                                 logging.debug(upd_qry)
@@ -398,9 +408,9 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                         logging.warning('API returned 429, waiting 65 seconds before trying again')
                         time.sleep(65)
 
-                if ct == 5: # exit ability to avoid infinite loop
+                if ct == 5:  # exit ability to avoid infinite loop
                     logging.critical('API rejected 5 consecutive times, terminating script!')
-                    quit()
+                    raise SystemExit
 
         running_total = running_total + game_ct
         logging.info(f'Games reviewed so far: {running_total}')
@@ -436,7 +446,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                     with open(dload_file, 'wb') as f:
                         for chunk in resp.iter_content(chunk_size=8196):
                             f.write(chunk)
-                    
+
                     logging.debug(dl_delete)
                     csr.execute(dl_delete)
                     conn.commit()
@@ -446,9 +456,9 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                         logging.warning('API returned 429, waiting 65 seconds before trying again')
                         time.sleep(65)
 
-                if ct == 5: # exit ability to avoid infinite loop
+                if ct == 5:  # exit ability to avoid infinite loop
                     logging.critical('API rejected 5 consecutive times, terminating script!')
-                    quit()
+                    raise SystemExit
 
         running_total = running_total + dl_ct
         logging.info(f'Currently downloaded {running_total} of {total_dl} games')
@@ -456,17 +466,17 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
         dl_list = [j for sub in dl_rec for j in sub]
         dl_ct = len(dl_list)
         ctr = ctr + 1
-    
+
     conn.close()
     with open(log_file, 'a') as f:
-        f.write('\t' + str(running_total) + '\n') # count of newly completed games
+        f.write('\t' + str(running_total) + '\n')  # count of newly completed games
     logging.info('Download for recently completed correspondence games ended')
 
     # verify files were downloaded before continuing
     file_list = [f for f in os.listdir(dload_path) if os.path.isfile(os.path.join(dload_path, f))]
     if len(file_list) == 0:
         logging.warning('No recently completed correspondence games found, process ended')
-        quit()
+        raise SystemExit
 
     # merge newly downloaded pgns
     logging.info('Merge of recently completed correspondence games started')
@@ -482,7 +492,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
     idx = []
     game_date = []
     game_text = []
-    gm_idx = 0 
+    gm_idx = 0
     with open(os.path.join(dload_path, merge_name), mode='r', encoding='utf-8', errors='replace') as pgn:
         gm_txt = chess.pgn.read_game(pgn)
         while gm_txt is not None:
@@ -494,7 +504,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
 
     idx_sort = [x for _, x in sorted(zip(game_date, idx))]
     sort_name = f'lichess_correspondence_{dte}_NewlyCompleted.pgn'
-    with open(os.path.join(dload_path, sort_name), 'w', encoding = 'utf-8') as sort_file:
+    with open(os.path.join(dload_path, sort_name), 'w', encoding='utf-8') as sort_file:
         for i in idx_sort:
             sort_file.write(str(game_text[i]) + '\n\n')
     logging.info('Sorting of recently completed correspondence games ended')
@@ -505,7 +515,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
         if filename != sort_name:
             fname_relpath = os.path.join(dload_path, filename)
             os.remove(fname_relpath)
-    
+
     if not os.path.isdir(dest_path):
         os.mkdir(dest_path)
     if os.getcwd != dest_path:
