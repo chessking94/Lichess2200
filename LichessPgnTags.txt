@@ -1,2 +1,0 @@
-WhiteElo >= "2200"
-BlackElo >= "2200"
