@@ -11,10 +11,20 @@ import pandas as pd
 import pyodbc as sql
 import requests
 
+# TODO: Investigate possible class implementation
+
 
 def get_conf(key):
     fname = r'C:\Users\eehunt\Repository\confidential.json'
     with open(fname, 'r') as t:
+        key_data = json.load(t)
+    val = key_data.get(key)
+    return val
+
+
+def get_config(filepath, key):
+    filename = os.path.join(filepath, 'config.json')
+    with open(filename, 'r') as t:
         key_data = json.load(t)
     val = key_data.get(key)
     return val
@@ -55,7 +65,7 @@ def main():
     # initiate
     dte = dt.datetime.now().strftime('%Y%m%d%H%M%S')
     scr_nm = os.path.splitext(os.path.basename(__file__))[0]
-    log_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'logs')
+    log_path = get_config(os.path.dirname(os.path.dirname(__file__)), 'logPath')
     if not os.path.isdir(log_path):
         os.mkdir(log_path)
     log_name = scr_nm + '_' + dte + '.log'
@@ -70,7 +80,7 @@ def main():
     )
 
     logging.info('Process started')
-    log_file = r'D:\eehunt\LONGTERM\Chess\LichessPGN\LichessPGN_Log.txt'
+    log_file = get_config(os.path.dirname(os.path.dirname(__file__)), 'logFile')
     file_path = r'D:\eehunt\LONGTERM\Chess\LichessPGN\2022'
     file_name = 'lichess_db_standard_rated_2022-08.pgn.bz2'
 
@@ -128,9 +138,15 @@ def main():
 
     # extract only 2200+ rating games
     logging.info('2200+ game extract started')
-    tag_file = r'C:\Users\eehunt\Repository\Lichess2200\LichessPgnTags.txt'
+    pgn_tag_name = 'LichessPgnTags.txt'
+    pgn_tag_file = os.path.join(file_path, pgn_tag_name)
+    with open(pgn_tag_file, 'w') as tf:
+        tf.write('WhiteElo >= "2200"')
+        tf.write('\n')
+        tf.write('BlackElo >= "2200"')
+
     pgn_name = f'lichess2200all_{yyyy}{mm}.pgn'
-    cmd_text = f'pgn-extract -N -V -D -pl2 -t"{tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags --output {pgn_name} {upd_name}'
+    cmd_text = f'pgn-extract -N -V -D -pl2 -t"{pgn_tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags --output {pgn_name} {upd_name}'
     if os.getcwd() != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -214,10 +230,15 @@ def main():
     # split pgn into corr games
     start_corr = dt.datetime.now().strftime('%H:%M:%S')
     logging.info('Complete correspondence game extract started')
-    tag_file = r'C:\Users\eehunt\Repository\Lichess2200\LichessCorrTag.txt'
+    corr_tag_name = 'LichessCorrTag.txt'
+    corr_tag_file = os.path.join(file_path, corr_tag_name)
+    tag_txt = 'TimeControl >= "86400"'
+    with open(corr_tag_file, 'w') as tf:
+        tf.write(tag_txt)
+
     minply = '6'
     corr_name = f'lichess_correspondence_orig_{yyyy}{mm}.pgn'
-    cmd_text = f'pgn-extract -N -V -D -s -pl{minply} -t"{tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags -o{corr_name} {upd_name}'
+    cmd_text = f'pgn-extract -N -V -D -s -pl{minply} -t"{corr_tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags -o{corr_name} {upd_name}'
     if os.getcwd() != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -296,6 +317,8 @@ def main():
     os.remove(os.path.join(file_path, upd_name))
     os.remove(os.path.join(file_path, pgn_name))
     os.remove(os.path.join(file_path, new_name))
+    os.remove(os.path.join(file_path, pgn_tag_name))
+    os.remove(os.path.join(file_path, corr_tag_name))
     if bad_dates:
         os.remove(nfile2)
         os.remove(os.path.join(file_path, corr_name))
