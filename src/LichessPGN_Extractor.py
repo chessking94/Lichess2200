@@ -81,8 +81,8 @@ def main():
 
     logging.info('Process started')
     log_file = get_config(os.path.dirname(os.path.dirname(__file__)), 'logFile')
-    file_path = r'D:\eehunt\LONGTERM\Chess\LichessPGN\2022'
-    file_name = 'lichess_db_standard_rated_2022-08.pgn.bz2'
+    file_path = get_config(os.path.dirname(os.path.dirname(__file__)), 'filePath')
+    file_name = get_config(os.path.dirname(os.path.dirname(__file__)), 'fileName')
 
     start_date = dt.datetime.now().strftime('%Y-%m-%d')
     decomp_start = ''
@@ -98,6 +98,7 @@ def main():
     decomp_start = dt.datetime.now().strftime('%H:%M:%S')
     logging.info('Decompression started')
     cmd_text = '7z e ' + file_name
+    logging.debug(cmd_text)
     if os.getcwd != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -113,6 +114,7 @@ def main():
     logging.info('Error log started')
     error_file = f'lichess_{yyyy}{mm}_errors.log'
     cmd_text = f'pgn-extract --quiet -r -l{error_file} {extracted_file}'
+    logging.debug(cmd_text)
     if os.getcwd != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -128,8 +130,8 @@ def main():
     nfile = os.path.join(file_path, upd_name)
     searchExp = '[TimeControl "-"]\n'
     replaceExp = '[TimeControl "1/86400"]\n'
-    wfile = open(nfile, 'w')
-    for line in fileinput.input(ofile, inplace=1):
+    wfile = open(nfile, 'w', encoding='utf-8')
+    for line in fileinput.input(ofile, inplace=1, openhook=fileinput.hook_encoded('utf-8')):
         if searchExp in line:
             line = line.replace(searchExp, replaceExp)
         wfile.write(line)
@@ -147,6 +149,7 @@ def main():
 
     pgn_name = f'lichess2200all_{yyyy}{mm}.pgn'
     cmd_text = f'pgn-extract -N -V -D -pl2 -t"{pgn_tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags --output {pgn_name} {upd_name}'
+    logging.debug(cmd_text)
     if os.getcwd() != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -165,8 +168,8 @@ def main():
         replaceExp2 = '[Date'
 
         # DO IT
-        wfile = open(nfile2, 'w')
-        for line in fileinput.input(os.path.join(file_path, pgn_name), inplace=1):
+        wfile = open(nfile2, 'w', encoding='utf-8')
+        for line in fileinput.input(os.path.join(file_path, pgn_name), inplace=1, openhook=fileinput.hook_encoded('utf-8')):
             if searchExp1 in line:
                 line = line.replace(searchExp1, replaceExp1)
             elif searchExp2 in line:
@@ -208,12 +211,14 @@ def main():
         # filter min time control
         tmp_file = f'temp{tc_type}_{curr_name}'
         cmd_text = f'pgn-extract --quiet -t{tc_tag_file_min} --output {tmp_file} {curr_name}'
+        logging.debug(cmd_text)
         if os.getcwd != file_path:
             os.chdir(file_path)
         os.system('cmd /C ' + cmd_text)
 
         # filter max time control
         cmd_text = f'pgn-extract --quiet -t{tc_tag_file_max} --output {new_tc_name} {tmp_file}'
+        logging.debug(cmd_text)
         if os.getcwd != file_path:
             os.chdir(file_path)
         os.system('cmd /C ' + cmd_text)
@@ -239,6 +244,7 @@ def main():
     minply = '6'
     corr_name = f'lichess_correspondence_orig_{yyyy}{mm}.pgn'
     cmd_text = f'pgn-extract -N -V -D -s -pl{minply} -t"{corr_tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags -o{corr_name} {upd_name}'
+    logging.debug(cmd_text)
     if os.getcwd() != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
@@ -257,8 +263,8 @@ def main():
         searchExp2 = '[UTCDate'
         replaceExp2 = '[Date'
 
-        wfile = open(nfile3, 'w')
-        for line in fileinput.input(curr_name, inplace=1):
+        wfile = open(nfile3, 'w', encoding='utf-8')
+        for line in fileinput.input(curr_name, inplace=1, openhook=fileinput.hook_encoded('utf-8')):
             if searchExp1 in line:
                 line = line.replace(searchExp1, replaceExp1)
             elif searchExp2 in line:
@@ -279,7 +285,7 @@ def main():
     completed_file = f'{os.path.splitext(new_name)[0]}_Completed.pgn'
     completed_full = os.path.join(file_path, completed_file)
     comp_ct = 0
-    with open(full_pgn, 'r') as pgn:
+    with open(full_pgn, 'r', encoding='utf-8') as pgn:
         ctr = 0
         game_text = chess.pgn.read_game(pgn)
         while game_text is not None:
@@ -351,7 +357,6 @@ def main():
 
         # corr count
         f.write('\t' + str(comp_ct))
-        # f.write('\n')
     logging.info('Counting games ended')
 
     # review for recently completed correspondence games
