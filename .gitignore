@@ -1,3 +1,4 @@
 logs/
 LichessPGN_ExtractorBackfill.py
 .vscode/
+__pycache__

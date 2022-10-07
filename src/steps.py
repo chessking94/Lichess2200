@@ -109,8 +109,8 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                             curr_status = g['status']
                             last_move = g['lastMoveAt']
                             if curr_status in completed_status:
-                                upd_qry = 'UPDATE OngoingLichessCorr'
-                                upd_qry = upd_qry + f'SET Download = 1, LastMoveAtUnix = {last_move}, LastReviewed = GETDATE()'
+                                upd_qry = 'UPDATE OngoingLichessCorr '
+                                upd_qry = upd_qry + f'SET Download = 1, LastMoveAtUnix = {last_move}, LastReviewed = GETDATE() '
                                 upd_qry = upd_qry + f"WHERE GameID = '{game_id}'"
                             else:
                                 # if no move has been played in at least 30 days, game is still considered ongoing. update to inactive
@@ -118,8 +118,8 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                                     inact = '1'
                                 else:
                                     inact = '0'
-                                upd_qry = 'UPDATE OngoingLichessCorr'
-                                upd_qry = upd_qry + f'SET LastMoveAtUnix = {last_move}, LastReviewed = GETDATE(), Inactive = {inact}'
+                                upd_qry = 'UPDATE OngoingLichessCorr '
+                                upd_qry = upd_qry + f'SET LastMoveAtUnix = {last_move}, LastReviewed = GETDATE(), Inactive = {inact} '
                                 upd_qry = upd_qry + f"WHERE GameID = '{game_id}'"
 
                             if upd_qry != '':
@@ -356,7 +356,7 @@ def update_timecontrol(file_path, file_name, y, m):
     searchExp = '[TimeControl "-"]\n'
     replaceExp = '[TimeControl "1/86400"]\n'
     wfile = open(nfile, 'w', encoding='utf-8')
-    for line in fileinput.input(ofile, inplace=1, openhook=fileinput.hook_encoded('utf-8')):
+    for line in fileinput.input(ofile, inplace=1):
         if searchExp in line:
             line = line.replace(searchExp, replaceExp)
         wfile.write(line)
