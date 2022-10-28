@@ -25,11 +25,11 @@ def completed_corr_download(token_value, game_url, dload_path):
     conn_str = func.get_conf('SqlServerConnectionStringTrusted')
     conn = sql.connect(conn_str)
     csr = conn.cursor()
-    total_qry = "SELECT COUNT(GameID) FROM OngoingLichessCorr WHERE Download = 1"
+    total_qry = "SELECT COUNT(GameID) FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE Download = 1"
     total_rec = pd.read_sql(total_qry, conn).values.tolist()
     total_dl = int(total_rec[0][0])
-    dl_qry = "SELECT TOP 300 GameID FROM OngoingLichessCorr WHERE Download = 1 ORDER BY GameID"
-    dl_delete = f"DELETE FROM OngoingLichessCorr WHERE GameID IN ({dl_qry})"
+    dl_qry = "SELECT TOP 300 GameID FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE Download = 1 ORDER BY GameID"
+    dl_delete = f"DELETE FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE GameID IN ({dl_qry})"
     dl_rec = pd.read_sql(dl_qry, conn).values.tolist()
     dl_list = [j for sub in dl_rec for j in sub]
     dl_ct = len(dl_list)
@@ -84,7 +84,7 @@ def completed_corr_pending(token_value, game_url):
     game_qry = """
 SELECT TOP 300
 GameID
-FROM OngoingLichessCorr
+FROM ChessWarehouse.dbo.OngoingLichessCorr
 WHERE (Inactive = 0 AND (LastReviewed IS NULL OR DATEDIFF(DAY, LastReviewed, GETDATE()) >= 7))
 OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
     """
@@ -109,7 +109,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                             curr_status = g['status']
                             last_move = g['lastMoveAt']
                             if curr_status in completed_status:
-                                upd_qry = 'UPDATE OngoingLichessCorr '
+                                upd_qry = 'UPDATE ChessWarehouse.dbo.OngoingLichessCorr '
                                 upd_qry = upd_qry + f'SET Download = 1, LastMoveAtUnix = {last_move}, LastReviewed = GETDATE() '
                                 upd_qry = upd_qry + f"WHERE GameID = '{game_id}'"
                             else:
@@ -118,7 +118,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                                     inact = '1'
                                 else:
                                     inact = '0'
-                                upd_qry = 'UPDATE OngoingLichessCorr '
+                                upd_qry = 'UPDATE ChessWarehouse.dbo.OngoingLichessCorr '
                                 upd_qry = upd_qry + f'SET LastMoveAtUnix = {last_move}, LastReviewed = GETDATE(), Inactive = {inact} '
                                 upd_qry = upd_qry + f"WHERE GameID = '{game_id}'"
 
@@ -130,7 +130,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                         # this would only happen for gameid's that don't exist in Lichess for some reason. no idea how but it did happen
                         for gm in game_list:
                             logging.warning(f'GameID {gm} does not exist, marking as inactive')
-                            upd_qry = f"UPDATE OngoingLichessCorr SET LastReviewed = GETDATE(), Inactive = 1 WHERE GameID = '{gm}'"
+                            upd_qry = f"UPDATE ChessWarehouse.dbo.OngoingLichessCorr SET LastReviewed = GETDATE(), Inactive = 1 WHERE GameID = '{gm}'"
                             if upd_qry != '':
                                 logging.debug(upd_qry)
                                 csr.execute(upd_qry)
@@ -255,12 +255,12 @@ def ongoing_corr(file_path, file_name):
             result = fmt.format_result(game_text, 'Result')
             if result is None:
                 gameid = fmt.format_source_id(game_text, 'Site')
-                qry_text = f"SELECT GameID FROM OngoingLichessCorr WHERE GameID = '{gameid}'"
+                qry_text = f"SELECT GameID FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE GameID = '{gameid}'"
                 gmlist = pd.read_sql(qry_text, conn).values.tolist()
                 gm_ct = len(gmlist)
                 sql_cmd = ''
                 if gm_ct == 0:
-                    sql_cmd = 'INSERT INTO OngoingLichessCorr (GameID, Filename, Download, Inactive) '
+                    sql_cmd = 'INSERT INTO ChessWarehouse.dbo.OngoingLichessCorr (GameID, Filename, Download, Inactive) '
                     sql_cmd = sql_cmd + f"VALUES ('{gameid}', '{file_name}', 0, 0)"
                 if sql_cmd != '':
                     logging.debug(sql_cmd)
