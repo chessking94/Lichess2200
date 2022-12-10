@@ -44,10 +44,9 @@ def main():
     # decompress file
     decomp_start = dt.datetime.now().strftime('%H:%M:%S')
     logging.info('Decompression started')
-    steps.decompress(file_path, file_name)
+    extracted_file = steps.decompress(file_path, file_name)
     decomp_end = dt.datetime.now().strftime('%H:%M:%S')
     logging.info('Decompression ended')
-    extracted_file = file_name.replace('.bz2', '')
 
     yyyy = extracted_file[26:30]
     mm = extracted_file[31:33]
@@ -138,9 +137,6 @@ def main():
                         if search_text in line:
                             ct = ct + 1
             f.write(str(ct) + '\t')
-
-        # corr count
-        f.write(str(comp_ct) + '\t')
     logging.info('Counting games ended')
 
     # review for recently completed correspondence games

@@ -14,8 +14,6 @@ import requests
 import format as fmt
 import func
 
-# TODO: Look into using zipfile instead of 7z
-
 
 def completed_corr_download(token_value, game_url, dload_path):
     hdr_pgn = {'Authorization': 'Bearer ' + token_value, 'Accept': 'application/x-chess-pgn'}
@@ -70,6 +68,7 @@ def completed_corr_download(token_value, game_url, dload_path):
         dl_ct = len(dl_list)
         ctr = ctr + 1
     conn.close()
+    return total_dl
 
 
 def completed_corr_pending(token_value, game_url):
@@ -157,11 +156,15 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
 
 
 def decompress(file_path, file_name):
-    cmd_text = '7z e ' + file_name
+    # https://github.com/facebook/zstd/releases/download/v1.4.4/zstd-v1.4.4-win64.zip
+    # lichess switched from bz2 to zst after 202210 file
+    new_file_name = file_name.replace('.zst', '')
+    cmd_text = f'zstd -d {file_name} -o {new_file_name}'
     logging.debug(cmd_text)
     if os.getcwd != file_path:
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
+    return new_file_name
 
 
 def errorlog(file_path, file_name, y, m):
@@ -202,7 +205,6 @@ def extract2200corr(file_path, temp_path, monthly_file, complete_file):
     old_name = os.path.join(temp_path, filter_name)
     new_name = os.path.join(file_path, final_name)
     os.rename(old_name, new_name)
-    shutil.rmtree(temp_path)
 
 
 def extractbulletblitz(file_path, tc_files, limit):
