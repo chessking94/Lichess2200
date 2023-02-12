@@ -1,12 +1,11 @@
 import datetime as dt
 import logging
 import os
+import shutil
 import sys
 
 import func
 import steps
-
-# TODO: Verify Corr_Additional game count log write is correct after next run
 
 
 def main():
@@ -101,7 +100,7 @@ def main():
         os.rename(os.path.join(file_path, corr_name), os.path.join(file_path, new_name))
 
     logging.info('Review for ongoing correspondence games started')
-    completed_file, ctr, comp_ct = steps.ongoing_corr(file_path, new_name)
+    completed_file, ctr = steps.ongoing_corr(file_path, new_name)
     tc_files.append(completed_file)
     logging.info(f'Total of {ctr} ongoing correspondence games')
     logging.info('Review for ongoing correspondence games ended')
@@ -142,10 +141,9 @@ def main():
     # review for recently completed correspondence games
     token_value = func.get_conf('LichessAPIToken')
     game_url = 'https://lichess.org/api/games/export/_ids'
-    yr = dt.datetime.now().strftime('%Y')
     root_path = r'D:\eehunt\LONGTERM\Chess\LichessPGN'
     dload_path = os.path.join(root_path, 'temp')
-    dest_path = os.path.join(root_path, yr)
+    dest_path = file_path
 
     logging.info('Review for recently completed correspondence games started')
     steps.completed_corr_pending(token_value, game_url)
@@ -203,7 +201,9 @@ def main():
     steps.extract2200corr(file_path, dload_path, completed_file, compcorr_name)
     logging.info('2200+ corr game file ended')
 
-    os.rmdir(dload_path)
+    if os.getcwd != root_path:
+        os.chdir(root_path)
+    shutil.rmtree(dload_path)
 
     logging.info('Process ended')
 

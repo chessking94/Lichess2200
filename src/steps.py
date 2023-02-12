@@ -275,7 +275,6 @@ def ongoing_corr(file_path, file_name):
     full_pgn = os.path.join(file_path, file_name)
     completed_file = f'{os.path.splitext(file_name)[0]}_Completed.pgn'
     completed_full = os.path.join(file_path, completed_file)
-    comp_ct = 0
     with open(full_pgn, 'r', encoding='utf-8') as pgn:
         ctr = 0
         game_text = chess.pgn.read_game(pgn)
@@ -283,12 +282,12 @@ def ongoing_corr(file_path, file_name):
             result = fmt.format_result(game_text, 'Result')
             if result is None:
                 gameid = fmt.format_source_id(game_text, 'Site')
-                qry_text = f"SELECT GameID FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE GameID = '{gameid}'"
+                qry_text = f"SELECT GameID FROM OngoingLichessCorr WHERE GameID = '{gameid}'"
                 gmlist = pd.read_sql(qry_text, conn).values.tolist()
                 gm_ct = len(gmlist)
                 sql_cmd = ''
                 if gm_ct == 0:
-                    sql_cmd = 'INSERT INTO ChessWarehouse.dbo.OngoingLichessCorr (GameID, Filename, Download, Inactive) '
+                    sql_cmd = 'INSERT INTO OngoingLichessCorr (GameID, Filename, Download, Inactive) '
                     sql_cmd = sql_cmd + f"VALUES ('{gameid}', '{file_name}', 0, 0)"
                 if sql_cmd != '':
                     logging.debug(sql_cmd)
@@ -296,13 +295,12 @@ def ongoing_corr(file_path, file_name):
                     conn.commit()
                     ctr = ctr + 1
             else:
-                comp_ct = comp_ct + 1
                 with open(completed_full, 'a', encoding='utf-8') as f:
                     f.write(str(game_text) + '\n\n')
 
             game_text = chess.pgn.read_game(pgn)
     conn.close()
-    return completed_file, ctr, comp_ct
+    return completed_file, ctr
 
 
 def sort_gamefile(file_path, file_name):
