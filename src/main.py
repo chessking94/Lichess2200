@@ -141,7 +141,7 @@ def main():
     # review for recently completed correspondence games
     token_value = func.get_conf('LichessAPIToken')
     game_url = 'https://lichess.org/api/games/export/_ids'
-    root_path = r'D:\eehunt\LONGTERM\Chess\LichessPGN'
+    root_path = r'S:\eehunt\LONGTERM\Chess\LichessPGN'
     dload_path = os.path.join(root_path, 'temp')
     dest_path = file_path
 
