@@ -167,6 +167,25 @@ def decompress(file_path, file_name):
     return new_file_name
 
 
+def download_file(url, root):
+    # download file
+    file_name = url.split('/')[-1]
+    yr = file_name[26:30]
+    dload_path = os.path.join(root, yr)
+    if not os.path.isdir(dload_path):
+        os.mkdir(dload_path)
+
+    with requests.get(url) as resp:
+        if resp.status_code != 200:
+            logging.warning(f'Unable to complete request to {url}! Request returned code {resp.status_code}')
+        else:
+            with open(os.path.join(dload_path, file_name), 'wb') as f:
+                for chunk in resp.iter_content(chunk_size=8196):
+                    f.write(chunk)
+
+    return [file_name, dload_path]
+
+
 def errorlog(file_path, file_name, y, m):
     error_file = f'lichess_{y}{m}_errors.log'
     cmd_text = f'pgn-extract --quiet -r -l{error_file} {file_name}'
@@ -234,6 +253,31 @@ def extractcorr(file_path, file_name, y, m):
     os.system('cmd /C ' + cmd_text)
     os.remove(os.path.join(file_path, corr_tag_name))
     return corr_name
+
+
+def files_to_process():
+    dloads = {}
+    dload_url = 'https://database.lichess.org/standard/list.txt'
+    with requests.get(dload_url, stream=True) as resp:
+        if resp.status_code != 200:
+            logging.warning(f'Unable to complete request to {dload_url}! Request returned code {resp.status_code}')
+        else:
+            for line in resp.iter_lines():
+                dload_name = line.decode('utf-8')
+                proc_name = dload_name.split('/')[-1].replace('.zst', '')
+                dloads[proc_name] = dload_name
+
+    files_to_download = []
+    for f in dloads:
+        conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+        conn = sql.connect(conn_str)
+        csr = conn.cursor()
+        qry = 'SELECT COUNT(Filename) FROM LichessDatabase WHERE Filename = ?'
+        csr.execute(qry, f)
+        if csr.fetchone()[0] == 0:
+            files_to_download.append(dloads[f])
+
+    return files_to_download
 
 
 def fix_datetag(file_path, file_name, y, m, corrflag):
