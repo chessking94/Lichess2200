@@ -36,38 +36,30 @@ def main():
         logging.info('Download started')
         file_root = func.get_config(os.path.dirname(os.path.dirname(__file__)), 'fileRoot')
         file_name, file_path = steps.download_file(online_file, file_root)
+        db_filename = os.path.splitext(file_name)[0]
+        steps.write_log(db_filename)
         logging.info('Download ended')
 
         log_file = func.get_config(os.path.dirname(os.path.dirname(__file__)), 'logFile')
 
-        start_date = dt.datetime.now().strftime('%Y-%m-%d')
-        decomp_start = ''
-        decomp_end = ''
-        error_start = ''
-        error_end = ''
-        start_2200 = ''
-        end_2200 = ''
-        start_corr = ''
-        end_corr = ''
-
         # decompress file
-        decomp_start = dt.datetime.now().strftime('%H:%M:%S')
         logging.info('Decompression started')
+        steps.write_log(db_filename, 'Decompression_Start', 'GETDATE()')
         extracted_file = steps.decompress(file_path, file_name)
-        decomp_end = dt.datetime.now().strftime('%H:%M:%S')
         logging.info('Decompression ended')
+        steps.write_log(db_filename, 'Decompression_End', 'GETDATE()')
 
         yyyy = extracted_file[26:30]
         mm = extracted_file[31:33]
 
         # create error log
-        error_start = dt.datetime.now().strftime('%H:%M:%S')
         logging.info('Error log started')
+        steps.write_log(db_filename, 'ErrorLog_Start', 'GETDATE()')
         steps.errorlog(file_path, extracted_file, yyyy, mm)
-        error_end = dt.datetime.now().strftime('%H:%M:%S')
         logging.info('Error log ended')
+        steps.write_log(db_filename, 'ErrorLog_End', 'GETDATE()')
 
-        start_2200 = dt.datetime.now().strftime('%H:%M:%S')
+        steps.write_log(db_filename, '[2200_Start]', 'GETDATE()')
 
         # update correspondence game TimeControl tag
         logging.info('Correspondence TimeControl tag update started')
@@ -92,10 +84,10 @@ def main():
 
         # separate into time control files
         tc_files = steps.split_timecontrol(file_path, curr_name, yyyy, mm)
-        end_2200 = dt.datetime.now().strftime('%H:%M:%S')
+        steps.write_log(db_filename, '[2200_End]', 'GETDATE()')
 
         # split pgn into corr games
-        start_corr = dt.datetime.now().strftime('%H:%M:%S')
+        steps.write_log(db_filename, 'Corr_Start', 'GETDATE()')
         logging.info('Complete correspondence game extract started')
         corr_name = steps.extractcorr(file_path, upd_name, yyyy, mm)
         logging.info('Complete correspondence game extract ended')
@@ -114,8 +106,7 @@ def main():
         tc_files.append(completed_file)
         logging.info(f'Total of {ctr} ongoing correspondence games')
         logging.info('Review for ongoing correspondence games ended')
-
-        end_corr = dt.datetime.now().strftime('%H:%M:%S')
+        steps.write_log(db_filename, 'Corr_End', 'GETDATE()')
 
         # clean up old files
         os.remove(os.path.join(file_path, extracted_file))
@@ -128,31 +119,28 @@ def main():
 
         # write to log file
         logging.info('Counting games started')
-        with open(log_file, 'a') as f:
-            # timings
-            f.write(extracted_file + '\t' + start_date + '\t')
-            f.write(decomp_start + '\t' + decomp_end + '\t')
-            f.write(error_start + '\t' + error_end + '\t')
-            f.write(start_2200 + '\t' + end_2200 + '\t')
-            f.write(start_corr + '\t' + end_corr + '\t')
+        # 2200 game counts
+        search_text = '[Event "'
+        for tcf in tc_files:
+            ct = 0
+            if os.path.isfile(os.path.join(file_path, tcf)):
+                with open(os.path.join(file_path, tcf), 'r') as ff:
+                    for line in ff:
+                        if search_text in line:
+                            ct = ct + 1
 
-            # 2200 game counts
-            search_text = '[Event "'
-            for tcf in tc_files:
-                ct = 0
-                if os.path.isfile(os.path.join(file_path, tcf)):
-                    with open(os.path.join(file_path, tcf), 'r') as ff:
-                        for line in ff:
-                            if search_text in line:
-                                ct = ct + 1
-                f.write(str(ct) + '\t')
+            tc = os.path.splitext(tcf)[0].split('_')[-1]
+            if tc in ['Bullet', 'Blitz', 'Rapid', 'Classical']:
+                steps.write_log(db_filename, f'{tc}_2200', 'GETDATE()')
+            else:
+                steps.write_log(db_filename, 'Corr_All', 'GETDATE()')
+
         logging.info('Counting games ended')
 
         # review for recently completed correspondence games
         token_value = func.get_conf('LichessAPIToken')
         game_url = 'https://lichess.org/api/games/export/_ids'
-        root_path = r'S:\eehunt\LONGTERM\Chess\LichessPGN'
-        dload_path = os.path.join(root_path, 'temp')
+        dload_path = os.path.join(file_root, 'temp')
         dest_path = file_path
 
         logging.info('Review for recently completed correspondence games started')
@@ -165,6 +153,7 @@ def main():
         with open(log_file, 'a') as f:
             f.write(str(running_total) + '\n')  # count of newly completed games
         logging.info('Download for recently completed correspondence games ended')
+        steps.write_log(db_filename, 'Corr_Additional', running_total)
 
         # verify files were downloaded before continuing
         if running_total == 0:
@@ -211,8 +200,8 @@ def main():
         steps.extract2200corr(file_path, dload_path, completed_file, compcorr_name)
         logging.info('2200+ corr game file ended')
 
-        if os.getcwd != root_path:
-            os.chdir(root_path)
+        if os.getcwd != file_root:
+            os.chdir(file_root)
         shutil.rmtree(dload_path)
 
         logging.info('Process ended')

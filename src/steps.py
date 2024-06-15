@@ -276,6 +276,7 @@ def files_to_process():
         csr.execute(qry, f)
         if csr.fetchone()[0] == 0:
             files_to_download.append(dloads[f])
+        conn.close()
 
     return files_to_download
 
@@ -432,3 +433,17 @@ def update_timecontrol(file_path, file_name, y, m):
         wfile.write(line)
     wfile.close()
     return upd_name
+
+
+def write_log(file_name, field_name=None, field_value=None):
+    conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+    conn = sql.connect(conn_str)
+    csr = conn.cursor()
+    if field_name is None:
+        qry = f"INSERT INTO dbo.LichessDatabase (Filename) VALUES ('{file_name}')"
+    else:
+        qry = f"UPDATE dbo.LichessDatabase SET {field_name} = {field_value} WHERE Filename = '{file_name}'"
+
+    csr.execute(qry)
+    csr.commit()
+    conn.close()
