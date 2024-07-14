@@ -1,6 +1,5 @@
 {
 	"logPath": "C:/Users/eehunt/Repository/Lichess2200/logs",
 	"logFile": "S:/eehunt/LONGTERM/Chess/LichessPGN/LichessPGN_Log.txt",
-	"fileRoot": "S:/eehunt/LONGTERM/Chess/LichessPGN",
-	"fileName": "lichess_db_standard_rated_2024-05.pgn.zst"
+	"fileRoot": "S:/eehunt/LONGTERM/Chess/LichessPGN"
 }
