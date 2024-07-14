@@ -131,9 +131,9 @@ def main():
 
             tc = os.path.splitext(tcf)[0].split('_')[-1]
             if tc in ['Bullet', 'Blitz', 'Rapid', 'Classical']:
-                steps.write_log(db_filename, f'{tc}_2200', 'GETDATE()')
+                steps.write_log(db_filename, f'{tc}_2200', ct)
             else:
-                steps.write_log(db_filename, 'Corr_All', 'GETDATE()')
+                steps.write_log(db_filename, 'Corr_All', ct)
 
         logging.info('Counting games ended')
 
