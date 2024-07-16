@@ -32,15 +32,18 @@ def main():
             ]
         )
 
+        log_file = func.get_config(os.path.dirname(os.path.dirname(__file__)), 'logFile')
+
+        # download file
         logging.info('Process started')
         logging.info('Download started')
+        db_filename = os.path.splitext(online_file.split('/')[-1])[0]
+        steps.write_log(db_filename, 'Download_Start', 'GETDATE()')
         file_root = func.get_config(os.path.dirname(os.path.dirname(__file__)), 'fileRoot')
         file_name, file_path = steps.download_file(online_file, file_root)
-        db_filename = os.path.splitext(file_name)[0]
         steps.write_log(db_filename)
         logging.info('Download ended')
-
-        log_file = func.get_config(os.path.dirname(os.path.dirname(__file__)), 'logFile')
+        steps.write_log(db_filename, 'Download_End', 'GETDATE()')
 
         # decompress file
         logging.info('Decompression started')
