@@ -5,6 +5,7 @@ import shutil
 import sys
 
 import func
+import requests
 import steps
 
 
@@ -33,6 +34,18 @@ def main():
         )
 
         log_file = func.get_config(os.path.dirname(os.path.dirname(__file__)), 'logFile')
+
+        tg_api_key = func.get_config(os.path.dirname(os.path.dirname(__file__)), 'telegramAPIKey')
+        tg_id = func.get_config(os.path.dirname(os.path.dirname(__file__)), 'telegramID')
+        msg = f"Begin processing '{online_file}'"
+        url = f'https://api.telegram.org/bot{tg_api_key}'
+        params = {'chat_id': tg_id, 'text': msg}
+        with requests.post(url + '/sendMessage', params=params) as resp:
+            cde = resp.status_code
+            if cde == 200:
+                logging.info('Telegram message sent successfully')
+            else:
+                logging.error(f'Outgoing File Telegram Notification Failed: Response Code {cde}')
 
         # download file
         logging.info('Process started')
@@ -208,6 +221,15 @@ def main():
         shutil.rmtree(dload_path)
 
         logging.info('Process ended')
+
+        msg = f"End processing '{online_file}'"
+        params = {'chat_id': tg_id, 'text': msg}
+        with requests.post(url + '/sendMessage', params=params) as resp:
+            cde = resp.status_code
+            if cde == 200:
+                logging.info('Telegram message sent successfully')
+            else:
+                logging.error(f'Outgoing File Telegram Notification Failed: Response Code {cde}')
 
 
 if __name__ == '__main__':
