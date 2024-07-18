@@ -10,6 +10,7 @@ import chess.pgn
 import pandas as pd
 import pyodbc as sql
 import requests
+import sqlalchemy as sa
 
 import format as fmt
 import func
@@ -22,14 +23,20 @@ def completed_corr_download(token_value, game_url, dload_path):
     dte = dt.datetime.now().strftime('%Y%m%d%H%M%S')
 
     conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+    connection_url = sa.engine.URL.create(
+        drivername='mssql+pyodbc',
+        query={"odbc_connect": conn_str}
+    )
+    qryengine = sa.create_engine(connection_url)
     conn = sql.connect(conn_str)
     csr = conn.cursor()
+
     total_qry = "SELECT COUNT(GameID) FROM OngoingLichessCorr WHERE Download = 1"
-    total_rec = pd.read_sql(total_qry, conn).values.tolist()
+    total_rec = pd.read_sql(total_qry, qryengine).values.tolist()
     total_dl = int(total_rec[0][0])
     dl_qry = "SELECT TOP 300 GameID FROM OngoingLichessCorr WHERE Download = 1 ORDER BY GameID"
     dl_delete = f"DELETE FROM OngoingLichessCorr WHERE GameID IN ({dl_qry})"
-    dl_rec = pd.read_sql(dl_qry, conn).values.tolist()
+    dl_rec = pd.read_sql(dl_qry, qryengine).values.tolist()
     dl_list = [j for sub in dl_rec for j in sub]
     dl_ct = len(dl_list)
     ctr = 1
@@ -63,19 +70,27 @@ def completed_corr_download(token_value, game_url, dload_path):
 
         running_total = running_total + dl_ct
         logging.info(f'Currently downloaded {running_total} of {total_dl} games')
-        dl_rec = pd.read_sql(dl_qry, conn).values.tolist()
+        dl_rec = pd.read_sql(dl_qry, qryengine).values.tolist()
         dl_list = [j for sub in dl_rec for j in sub]
         dl_ct = len(dl_list)
         ctr = ctr + 1
     conn.close()
+    qryengine.dispose()
+
     return total_dl
 
 
 def completed_corr_pending(token_value, game_url):
-    conn_str = func.get_conf('SqlServerConnectionStringTrusted')
     hdr_json = {'Authorization': 'Bearer ' + token_value, 'Accept': 'application/x-ndjson'}
     completed_status = ['aborted', 'mate', 'resign', 'stalemate', 'timeout', 'draw', 'outoftime', 'cheat']
     curr_unix = int(time.time()*1000)
+
+    conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+    connection_url = sa.engine.URL.create(
+        drivername='mssql+pyodbc',
+        query={"odbc_connect": conn_str}
+    )
+    qryengine = sa.create_engine(connection_url)
     conn = sql.connect(conn_str)
     csr = conn.cursor()
 
@@ -88,7 +103,7 @@ FROM OngoingLichessCorr
 WHERE (Inactive = 0 AND (LastReviewed IS NULL OR DATEDIFF(DAY, LastReviewed, GETDATE()) >= 7))
 OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
     """
-    game_rec = pd.read_sql(game_qry, conn).values.tolist()
+    game_rec = pd.read_sql(game_qry, qryengine).values.tolist()
     game_list = [j for sub in game_rec for j in sub]
     game_ct = len(game_list)
     running_total = 0
@@ -148,10 +163,13 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
 
         running_total = running_total + game_ct
         logging.info(f'Games reviewed so far: {running_total}')
-        game_rec = pd.read_sql(game_qry, conn).values.tolist()
+        game_rec = pd.read_sql(game_qry, qryengine).values.tolist()
         game_list = [j for sub in game_rec for j in sub]
         game_ct = len(game_list)
+
     conn.close()
+    qryengine.dispose()
+
     return running_total
 
 
@@ -314,6 +332,11 @@ def merge_files(file_path):
 
 def ongoing_corr(file_path, file_name):
     conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+    connection_url = sa.engine.URL.create(
+        drivername='mssql+pyodbc',
+        query={"odbc_connect": conn_str}
+    )
+    qryengine = sa.create_engine(connection_url)
     conn = sql.connect(conn_str)
     csr = conn.cursor()
 
@@ -328,7 +351,7 @@ def ongoing_corr(file_path, file_name):
             if result is None:
                 gameid = fmt.format_source_id(game_text, 'Site')
                 qry_text = f"SELECT GameID FROM OngoingLichessCorr WHERE GameID = '{gameid}'"
-                gmlist = pd.read_sql(qry_text, conn).values.tolist()
+                gmlist = pd.read_sql(qry_text, qryengine).values.tolist()
                 gm_ct = len(gmlist)
                 sql_cmd = ''
                 if gm_ct == 0:
@@ -344,7 +367,10 @@ def ongoing_corr(file_path, file_name):
                     f.write(str(game_text) + '\n\n')
 
             game_text = chess.pgn.read_game(pgn)
+
     conn.close()
+    qryengine.dispose()
+
     return completed_file, ctr
 
 
