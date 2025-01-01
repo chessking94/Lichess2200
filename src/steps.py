@@ -1,5 +1,4 @@
 import datetime as dt
-import fileinput
 import json
 import logging
 import os
@@ -13,7 +12,6 @@ import requests
 import sqlalchemy as sa
 
 import format as fmt
-import func
 
 
 def completed_corr_download(token_value, game_url, dload_path):
@@ -22,25 +20,24 @@ def completed_corr_download(token_value, game_url, dload_path):
         os.mkdir(dload_path)
     dte = dt.datetime.now().strftime('%Y%m%d%H%M%S')
 
-    conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+    conn_str = os.getenv('ConnectionStringOdbcRelease')
     connection_url = sa.engine.URL.create(
         drivername='mssql+pyodbc',
-        query={"odbc_connect": conn_str}
+        query={'odbc_connect': conn_str}
     )
     qryengine = sa.create_engine(connection_url)
     conn = sql.connect(conn_str)
     csr = conn.cursor()
 
-    total_qry = "SELECT COUNT(GameID) FROM OngoingLichessCorr WHERE Download = 1"
+    total_qry = 'SELECT COUNT(GameID) FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE Download = 1'
     total_rec = pd.read_sql(total_qry, qryengine).values.tolist()
     total_dl = int(total_rec[0][0])
-    dl_qry = "SELECT TOP 300 GameID FROM OngoingLichessCorr WHERE Download = 1 ORDER BY GameID"
-    dl_delete = f"DELETE FROM OngoingLichessCorr WHERE GameID IN ({dl_qry})"
+    dl_qry = 'SELECT TOP 300 GameID FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE Download = 1 ORDER BY GameID'
+    dl_delete = f'DELETE FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE GameID IN ({dl_qry})'
     dl_rec = pd.read_sql(dl_qry, qryengine).values.tolist()
     dl_list = [j for sub in dl_rec for j in sub]
     dl_ct = len(dl_list)
     ctr = 1
-    running_total = 0
     while dl_ct > 0:
         dl_join = ','.join(dl_list)
         dload_name = f'lichess_newlycomplete_{dte}_{ctr}.pgn'
@@ -68,12 +65,11 @@ def completed_corr_download(token_value, game_url, dload_path):
                     logging.critical('API rejected 5 consecutive times, terminating script!')
                     raise SystemExit
 
-        running_total = running_total + dl_ct
-        logging.info(f'Currently downloaded {running_total} of {total_dl} games')
         dl_rec = pd.read_sql(dl_qry, qryengine).values.tolist()
         dl_list = [j for sub in dl_rec for j in sub]
         dl_ct = len(dl_list)
         ctr = ctr + 1
+
     conn.close()
     qryengine.dispose()
 
@@ -85,21 +81,19 @@ def completed_corr_pending(token_value, game_url):
     completed_status = ['aborted', 'mate', 'resign', 'stalemate', 'timeout', 'draw', 'outoftime', 'cheat']
     curr_unix = int(time.time()*1000)
 
-    conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+    conn_str = os.getenv('ConnectionStringOdbcRelease')
     connection_url = sa.engine.URL.create(
         drivername='mssql+pyodbc',
-        query={"odbc_connect": conn_str}
+        query={'odbc_connect': conn_str}
     )
     qryengine = sa.create_engine(connection_url)
     conn = sql.connect(conn_str)
     csr = conn.cursor()
 
     # update database table
-    logging.info('Review for recently completed correspondence games started')
     game_qry = """
-SELECT TOP 300
-GameID
-FROM OngoingLichessCorr
+SELECT TOP 300 GameID
+FROM ChessWarehouse.dbo.OngoingLichessCorr
 WHERE (Inactive = 0 AND (LastReviewed IS NULL OR DATEDIFF(DAY, LastReviewed, GETDATE()) >= 7))
 OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
     """
@@ -124,7 +118,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                             curr_status = g['status']
                             last_move = g['lastMoveAt']
                             if curr_status in completed_status:
-                                upd_qry = 'UPDATE OngoingLichessCorr '
+                                upd_qry = 'UPDATE ChessWarehouse.dbo.OngoingLichessCorr '
                                 upd_qry = upd_qry + f'SET Download = 1, LastMoveAtUnix = {last_move}, LastReviewed = GETDATE() '
                                 upd_qry = upd_qry + f"WHERE GameID = '{game_id}'"
                             else:
@@ -133,7 +127,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                                     inact = '1'
                                 else:
                                     inact = '0'
-                                upd_qry = 'UPDATE OngoingLichessCorr '
+                                upd_qry = 'UPDATE ChessWarehouse.dbo.OngoingLichessCorr '
                                 upd_qry = upd_qry + f'SET LastMoveAtUnix = {last_move}, LastReviewed = GETDATE(), Inactive = {inact} '
                                 upd_qry = upd_qry + f"WHERE GameID = '{game_id}'"
 
@@ -145,7 +139,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                         # this would only happen for gameid's that don't exist in Lichess for some reason. no idea how but it did happen
                         for gm in game_list:
                             logging.warning(f'GameID {gm} does not exist, marking as inactive')
-                            upd_qry = f"UPDATE OngoingLichessCorr SET LastReviewed = GETDATE(), Inactive = 1 WHERE GameID = '{gm}'"
+                            upd_qry = f"UPDATE ChessWarehouse.dbo.OngoingLichessCorr SET LastReviewed = GETDATE(), Inactive = 1 WHERE GameID = '{gm}'"
                             if upd_qry != '':
                                 logging.debug(upd_qry)
                                 csr.execute(upd_qry)
@@ -162,7 +156,6 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
                     raise SystemExit
 
         running_total = running_total + game_ct
-        logging.info(f'Games reviewed so far: {running_total}')
         game_rec = pd.read_sql(game_qry, qryengine).values.tolist()
         game_list = [j for sub in game_rec for j in sub]
         game_ct = len(game_list)
@@ -179,27 +172,30 @@ def decompress(file_path, file_name):
     new_file_name = file_name.replace('.zst', '')
     cmd_text = f'zstd -d {file_name} -o {new_file_name}'
     logging.debug(cmd_text)
-    if os.getcwd != file_path:
+    if os.path.normpath(os.getcwd()) != os.path.normpath(file_path):
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
+
     return new_file_name
 
 
 def download_file(url, root):
     # download file
     file_name = url.split('/')[-1]
-    yr = file_name[26:30]
-    dload_path = os.path.join(root, yr)
+    dte = dt.datetime.now().strftime('%Y%m%d-%H%M%S')
+    dload_path = os.path.join(root, dte)
     if not os.path.isdir(dload_path):
         os.mkdir(dload_path)
 
-    with requests.get(url) as resp:
+    with requests.get(url, stream=True) as resp:
         if resp.status_code != 200:
-            logging.warning(f'Unable to complete request to {url}! Request returned code {resp.status_code}')
+            logging.critical(f'Unable to complete download to {url}! Request returned code {resp.status_code}')
+            raise SystemExit
         else:
             with open(os.path.join(dload_path, file_name), 'wb') as f:
-                for chunk in resp.iter_content(chunk_size=8196):
-                    f.write(chunk)
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:  # filter out keep-alive chunks
+                        f.write(chunk)
 
     return [file_name, dload_path]
 
@@ -208,7 +204,7 @@ def errorlog(file_path, file_name, y, m):
     error_file = f'lichess_{y}{m}_errors.log'
     cmd_text = f'pgn-extract --quiet -r -l{error_file} {file_name}'
     logging.debug(cmd_text)
-    if os.getcwd != file_path:
+    if os.path.normpath(os.getcwd()) != os.path.normpath(file_path):
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
 
@@ -224,16 +220,20 @@ def extract2200(file_path, file_name, y, m):
     pgn_name = f'lichess2200all_{y}{m}.pgn'
     cmd_text = f'pgn-extract -N -V -D -pl2 -t"{pgn_tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags --output {pgn_name} {file_name}'
     logging.debug(cmd_text)
-    if os.getcwd() != file_path:
+    if os.path.normpath(os.getcwd()) != os.path.normpath(file_path):
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
     os.remove(os.path.join(file_path, pgn_tag_name))
+
     return pgn_name
 
 
 def extract2200corr(file_path, temp_path, monthly_file, complete_file):
     shutil.copy(os.path.join(file_path, monthly_file), temp_path)
-    shutil.copy(os.path.join(file_path, complete_file), temp_path)
+    if complete_file is not None:
+        # this would happen when no recently completed correspondence game were found
+        shutil.copy(os.path.join(file_path, complete_file), temp_path)
+
     merge_name = merge_files(temp_path)
     yyyy = monthly_file[23:27]
     mm = monthly_file[27:29]
@@ -250,7 +250,7 @@ def extractbulletblitz(file_path, tc_files, limit):
             lim_name = os.path.splitext(file)[0] + f'_{limit}' + '.pgn'
             cmd_text = f'pgn-extract --quiet --gamelimit {limit} --output {lim_name} {file}'
             logging.debug(cmd_text)
-            if os.getcwd != file_path:
+            if os.path.normpath(os.getcwd()) != os.path.normpath(file_path):
                 os.chdir(file_path)
             os.system('cmd /C ' + cmd_text)
 
@@ -266,10 +266,11 @@ def extractcorr(file_path, file_name, y, m):
     corr_name = f'lichess_correspondence_orig_{y}{m}.pgn'
     cmd_text = f'pgn-extract -N -V -D -s -pl{minply} -t"{corr_tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags -o{corr_name} {file_name}'
     logging.debug(cmd_text)
-    if os.getcwd() != file_path:
+    if os.path.normpath(os.getcwd()) != os.path.normpath(file_path):
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
     os.remove(os.path.join(file_path, corr_tag_name))
+
     return corr_name
 
 
@@ -287,10 +288,10 @@ def files_to_process():
 
     files_to_download = []
     for f in dloads:
-        conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+        conn_str = os.getenv('ConnectionStringOdbcRelease')
         conn = sql.connect(conn_str)
         csr = conn.cursor()
-        qry = 'SELECT COUNT(Filename) FROM LichessDatabase WHERE Filename = ?'
+        qry = 'SELECT COUNT(Filename) FROM ChessWarehouse.dbo.LichessDatabase WHERE Filename = ?'
         csr.execute(qry, f)
         if csr.fetchone()[0] == 0:
             files_to_download.append(dloads[f])
@@ -304,37 +305,40 @@ def fix_datetag(file_path, file_name, y, m, corrflag):
         new_name = f'lichess_correspondence_{y}{m}.pgn'
     else:
         new_name = f'lichess2200allfixed_{y}{m}.pgn'
-    nfile = os.path.join(file_path, new_name)
+    new_file_path = os.path.join(file_path, new_name)
     searchExp1 = '[Date "????.??.??"]\n'
     replaceExp1 = ''
     searchExp2 = '[UTCDate'
     replaceExp2 = '[Date'
 
-    wfile = open(nfile, 'w', encoding='utf-8')
-    for line in fileinput.input(os.path.join(file_path, file_name), inplace=1, openhook=fileinput.hook_encoded('utf-8')):
-        if searchExp1 in line:
-            line = line.replace(searchExp1, replaceExp1)
-        elif searchExp2 in line:
-            line = line.replace(searchExp2, replaceExp2)
-        wfile.write(line)
-    wfile.close()
+    input_file_path = os.path.join(file_path, file_name)
+    with open(input_file_path, 'r', encoding='utf-8') as input_file:
+        with open(new_file_path, 'w', encoding='utf-8') as new_file:
+            for line in input_file:
+                if searchExp1 in line:
+                    line = line.replace(searchExp1, replaceExp1)
+                elif searchExp2 in line:
+                    line = line.replace(searchExp2, replaceExp2)
+                new_file.write(line)
+
     return new_name
 
 
 def merge_files(file_path):
     merge_name = 'mergedgamefile.pgn'
     cmd_text = 'copy /B *.pgn ' + merge_name + ' >nul'
-    if os.getcwd != file_path:
+    if os.path.normpath(os.getcwd()) != os.path.normpath(file_path):
         os.chdir(file_path)
     os.system('cmd /C ' + cmd_text)
+
     return merge_name
 
 
 def ongoing_corr(file_path, file_name):
-    conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+    conn_str = os.getenv('ConnectionStringOdbcRelease')
     connection_url = sa.engine.URL.create(
         drivername='mssql+pyodbc',
-        query={"odbc_connect": conn_str}
+        query={'odbc_connect': conn_str}
     )
     qryengine = sa.create_engine(connection_url)
     conn = sql.connect(conn_str)
@@ -350,12 +354,12 @@ def ongoing_corr(file_path, file_name):
             result = fmt.format_result(game_text, 'Result')
             if result is None:
                 gameid = fmt.format_source_id(game_text, 'Site')
-                qry_text = f"SELECT GameID FROM OngoingLichessCorr WHERE GameID = '{gameid}'"
+                qry_text = f"SELECT GameID FROM ChessWarehouse.dbo.OngoingLichessCorr WHERE GameID = '{gameid}'"
                 gmlist = pd.read_sql(qry_text, qryengine).values.tolist()
                 gm_ct = len(gmlist)
                 sql_cmd = ''
                 if gm_ct == 0:
-                    sql_cmd = 'INSERT INTO OngoingLichessCorr (GameID, Filename, Download, Inactive) '
+                    sql_cmd = 'INSERT INTO ChessWarehouse.dbo.OngoingLichessCorr (GameID, Filename, Download, Inactive) '
                     sql_cmd = sql_cmd + f"VALUES ('{gameid}', '{file_name}', 0, 0)"
                 if sql_cmd != '':
                     logging.debug(sql_cmd)
@@ -394,6 +398,7 @@ def sort_gamefile(file_path, file_name):
     with open(os.path.join(file_path, sort_name), 'w', encoding='utf-8') as sort_file:
         for i in idx_sort:
             sort_file.write(str(game_text[i]) + '\n\n')
+
     return sort_name
 
 
@@ -426,14 +431,14 @@ def split_timecontrol(file_path, file_name, y, m):
         tmp_file = f'temp{tc_type}_{file_name}'
         cmd_text = f'pgn-extract --quiet -t{tc_tag_file_min} --output {tmp_file} {file_name}'
         logging.debug(cmd_text)
-        if os.getcwd != file_path:
+        if os.path.normpath(os.getcwd()) != os.path.normpath(file_path):
             os.chdir(file_path)
         os.system('cmd /C ' + cmd_text)
 
         # filter max time control
         cmd_text = f'pgn-extract --quiet -t{tc_tag_file_max} --output {new_tc_name} {tmp_file}'
         logging.debug(cmd_text)
-        if os.getcwd != file_path:
+        if os.path.normpath(os.getcwd()) != os.path.normpath(file_path):
             os.chdir(file_path)
         os.system('cmd /C ' + cmd_text)
 
@@ -442,7 +447,7 @@ def split_timecontrol(file_path, file_name, y, m):
         os.remove(os.path.join(file_path, tmp_file))
         os.remove(tc_tag_file_min_full)
         os.remove(tc_tag_file_max_full)
-        logging.info(f'{tc_type} extract ended')
+
     return tc_files
 
 
@@ -452,23 +457,25 @@ def update_timecontrol(file_path, file_name, y, m):
     nfile = os.path.join(file_path, upd_name)
     searchExp = '[TimeControl "-"]\n'
     replaceExp = '[TimeControl "1/86400"]\n'
-    wfile = open(nfile, 'w', encoding='utf-8')
-    for line in fileinput.input(ofile, inplace=1):
-        if searchExp in line:
-            line = line.replace(searchExp, replaceExp)
-        wfile.write(line)
-    wfile.close()
+
+    with open(ofile, 'r', encoding='utf-8') as input_file:
+        with open(nfile, 'w', encoding='utf-8') as output_file:
+            for line in input_file:
+                if searchExp in line:
+                    line = line.replace(searchExp, replaceExp)
+                output_file.write(line)
+
     return upd_name
 
 
 def write_log(file_name, field_name=None, field_value=None):
-    conn_str = func.get_conf('SqlServerConnectionStringTrusted')
+    conn_str = os.getenv('ConnectionStringOdbcRelease')
     conn = sql.connect(conn_str)
     csr = conn.cursor()
     if field_name is None:
-        qry = f"INSERT INTO dbo.LichessDatabase (Filename) VALUES ('{file_name}')"
+        qry = f"INSERT INTO ChessWarehouse.dbo.LichessDatabase (Filename) VALUES ('{file_name}')"
     else:
-        qry = f"UPDATE dbo.LichessDatabase SET {field_name} = {field_value} WHERE Filename = '{file_name}'"
+        qry = f"UPDATE ChessWarehouse.dbo.LichessDatabase SET {field_name} = {field_value} WHERE Filename = '{file_name}'"
 
     csr.execute(qry)
     csr.commit()
