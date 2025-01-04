@@ -59,18 +59,19 @@ def main():
         logging.info('Correspondence TimeControl tag update started')
         upd_name = steps.update_timecontrol(file_path, extracted_file, yyyy, mm)
 
+        os.remove(os.path.join(file_path, extracted_file))  # file no longer needed
+
         # extract only 2200+ rating games
         logging.info('2200+ game extract started')
         pgn_name = steps.extract2200(file_path, upd_name, yyyy, mm)
 
         # fix date tag if file is earlier than 201804
-        bad_dates = False
         if int(yyyy + mm) <= 201803:
-            bad_dates = True
             logging.info(f'Filedate = {yyyy}{mm}')
             logging.info('Date tag update started')
             new_pgn_name_2 = steps.fix_datetag(file_path, pgn_name, yyyy, mm, False)
             curr_name = new_pgn_name_2
+            os.remove(os.path.join(file_path, pgn_name))
         else:
             curr_name = pgn_name
 
@@ -78,11 +79,13 @@ def main():
         logging.info('Splitting into time-control files started')
         tc_files = steps.split_timecontrol(file_path, curr_name, yyyy, mm)
         steps.write_log(db_filename, '[2200_End]', 'GETDATE()')
+        os.remove(os.path.join(file_path, curr_name))
 
         # split pgn into corr games
         logging.info('Complete correspondence game extract started')
         steps.write_log(db_filename, 'Corr_Start', 'GETDATE()')
         corr_name = steps.extractcorr(file_path, upd_name, yyyy, mm)
+        os.remove(os.path.join(file_path, upd_name))
 
         # fix date tag if file is earlier than 201804
         new_name = f'lichess_correspondence_{yyyy}{mm}.pgn'
@@ -91,23 +94,16 @@ def main():
             logging.info('Corr Date tag update started')
             _ = steps.fix_datetag(file_path, corr_name, yyyy, mm, True)
             # do not need to set new_name since it's for creating a file, which steps.fix_datetag does for us
+            os.remove(os.path.join(file_path, corr_name))
         else:
             os.rename(os.path.join(file_path, corr_name), os.path.join(file_path, new_name))
 
         logging.info('Review for ongoing correspondence games started')
         completed_file, ctr = steps.ongoing_corr(file_path, new_name)
         tc_files.append(completed_file)
+        os.remove(os.path.join(file_path, new_name))
         logging.info(f'Total of {ctr} ongoing correspondence games')
         steps.write_log(db_filename, 'Corr_End', 'GETDATE()')
-
-        # clean up old files
-        os.remove(os.path.join(file_path, extracted_file))
-        os.remove(os.path.join(file_path, upd_name))
-        os.remove(os.path.join(file_path, pgn_name))
-        os.remove(os.path.join(file_path, new_name))
-        if bad_dates:
-            os.remove(os.path.join(file_path, new_pgn_name_2))
-            os.remove(os.path.join(file_path, corr_name))
 
         # 2200 game counts
         logging.info('Counting games started')
