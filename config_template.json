@@ -1,5 +1,5 @@
 {
-	"logRoot": "C:/Logs",
-	"downloadRoot": "C:/Downloads",
-	"finalRoot": "C:/Final"
+	"logRoot": "$(PYTHON_LOG_ROOT)",
+	"downloadRoot": "$(DOWNLOAD_ROOT)",
+	"finalRoot": "$(FINAL_ROOT)"
 }
