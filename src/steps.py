@@ -297,7 +297,7 @@ def files_to_process():
             files_to_download.append(dloads[f])
         conn.close()
 
-    return files_to_download
+    return sorted(files_to_download)
 
 
 def fix_datetag(file_path, file_name, y, m, corrflag):
