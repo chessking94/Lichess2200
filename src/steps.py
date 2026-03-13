@@ -32,8 +32,7 @@ def files_to_process():
 
     files_to_download = []
     for f in dloads:
-        # conn_str = os.getenv('ConnectionStringOdbcRelease')
-        conn_str = os.getenv('ConnectionStringOdbcDebug')
+        conn_str = os.getenv('ConnectionStringOdbcRelease')
         conn = sql.connect(conn_str)
         csr = conn.cursor()
         qry = 'SELECT COUNT(Filename) FROM ChessWarehouse.dbo.LichessDatabase WHERE Filename = ?'
@@ -53,13 +52,13 @@ class DatabaseExport:
         self.yyyy = self.pgn_file[26:30]
         self.mm = self.pgn_file[31:33]
 
-        # self.conn_str = os.getenv('ConnectionStringOdbcRelease')
-        self.conn_str = os.getenv('ConnectionStringOdbcDebug')
+        self.conn_str = os.getenv('ConnectionStringOdbcRelease')
 
         self.download_root = misc.get_config('downloadRoot', CONFIG_FILE)
         self.download_path = os.path.join(self.download_root, dt.datetime.now().strftime('%Y%m%d-%H%M%S'))
 
         self.files_to_keep = []
+        self.analysis_files = []
 
         self.pgn_file_updated_tc = None
         self.timecontrol_files = []
@@ -76,6 +75,7 @@ class DatabaseExport:
         self._count_games()
         self._recently_completed_corr()
         self._extractbulletblitz()
+        self._queue_analysis()
         self._cleanup()
 
     def _initialize(self):
@@ -156,10 +156,6 @@ class DatabaseExport:
         # separate into time control files
         logging.info('Splitting into time-control files started')
         self.timecontrol_files = self._split_timecontrol(os.path.join(self.download_path, pgn_file_2000_all_fixedtags))
-        self.timecontrol_files.append('lichess2200_201603_Bullet.pgn')
-        self.timecontrol_files.append('lichess2200_201603_Blitz.pgn')
-        self.timecontrol_files.append('lichess2200_201603_Rapid.pgn')
-        self.timecontrol_files.append('lichess2200_201603_Classical.pgn')
         self.files_to_keep.extend(self.timecontrol_files)
         self._write_log('[2200_End]', 'GETDATE()')
         os.remove(os.path.join(self.download_path, pgn_file_2000_all_fixedtags))
@@ -179,11 +175,9 @@ class DatabaseExport:
         logging.debug(cmd_text)
         _ = subprocess.run(cmd_text, cwd=self.download_path, check=True, capture_output=True, text=True)
         os.remove(os.path.join(self.download_path, corr_tag_name))
-
         os.remove(os.path.join(self.download_path, self.pgn_file_updated_tc))
 
         pgn_file_corr_all = self._fix_datetags(os.path.join(self.download_path, pgn_file_corr_all_temp), True)
-        pgn_file_corr_all = 'lichess_201603_Correspondence.pgn'
         if os.path.exists(os.path.join(self.download_path, pgn_file_corr_all_temp)):
             os.remove(os.path.join(self.download_path, pgn_file_corr_all_temp))
 
@@ -320,6 +314,29 @@ class DatabaseExport:
                 logging.debug(cmd_text)
                 _ = subprocess.run(cmd_text, cwd=self.download_path, check=True, capture_output=True, text=True)
                 self.files_to_keep.append(lim_name)
+                self.analysis_files.append(lim_name)
+
+    def _queue_analysis(self):
+        # copy files in self.files_to_keep to temp directory
+        temp_path = os.path.join(self.download_root, 'analysis')
+        if not os.path.isdir(temp_path):
+            os.mkdir(temp_path)
+
+        for file in self.analysis_files:
+            shutil.move(os.path.join(self.download_path, file), os.path.join(temp_path, file))
+
+        merge_name = self._merge_files(temp_path)
+
+        # move new archive to expected directory
+        analysis_dir = misc.get_config('analysisDir', CONFIG_FILE)
+        if not os.path.exists(analysis_dir):
+            os.mkdir(analysis_dir)
+        analysis_name = f'lichess2200_{self.yyyy}{self.mm}_Analysis.pgn'
+        shutil.move(os.path.join(temp_path, merge_name), os.path.join(analysis_dir, analysis_name))
+
+        if os.path.normpath(os.getcwd()) == os.path.normpath(temp_path):
+            os.chdir('..')
+        shutil.rmtree(temp_path)
 
     def _cleanup(self):
         self._create_zip()
@@ -458,6 +475,9 @@ class DatabaseExport:
             cmd_text = f'pgn-extract --quiet -t{tc_tag_file_max} --output {new_tc_name} {tmp_file}'
             logging.debug(cmd_text)
             _ = subprocess.run(cmd_text, cwd=os.path.dirname(input_file), check=True, capture_output=True, text=True)
+
+            if tc_type in ['Rapid', 'Classical']:
+                self.analysis_files.append(new_tc_name)
 
             tc_files.append(new_tc_name)
             i = i + 1
@@ -686,6 +706,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
         new_name = os.path.join(file_path, final_name)
         os.rename(old_name, new_name)
         self.files_to_keep.append(final_name)
+        self.analysis_files.append(final_name)
 
     def _create_zip(self):
         # copy files in self.files_to_keep to temp directory

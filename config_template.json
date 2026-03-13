@@ -1,5 +1,6 @@
 {
 	"logRoot": "$(PYTHON_LOG_ROOT)",
 	"downloadRoot": "$(DOWNLOAD_ROOT)",
+	"analysisDir": "$(ANALYSIS_DIR)",
 	"finalRoot": "$(FINAL_ROOT)"
 }
