@@ -108,8 +108,8 @@ class DatabaseExport:
         logging.info('Decompression started')
         self._write_log('Decompression_Start', 'GETDATE()')
 
-        cmd_text = f'zstd -d {self.archive_file} -o {self.pgn_file}'
-        result = subprocess.run(cmd_text, cwd=self.download_path, capture_output=True, text=True)
+        cmd_list = ['zstd', '-d', self.archive_file, '-o', self.pgn_File]
+        result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
         if result.returncode != 0:
             logging.critical(f'Error extracting archive: {result.stderr}')
             raise SystemExit
@@ -121,9 +121,8 @@ class DatabaseExport:
         self._write_log('ErrorLog_Start', 'GETDATE()')
 
         error_file = f'lichess_{self.yyyy}{self.mm}_errors.log'
-        cmd_text = f'pgn-extract --quiet -r -l{error_file} {self.pgn_file}'
-        logging.debug(cmd_text)
-        result = subprocess.run(cmd_text, cwd=self.download_path, capture_output=True, text=True)
+        cmd_list = ['pgn-extract', '--quiet', '-r', f'-l{error_file}', self.pgn_file]
+        result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
         if result.returncode != 0:
             logging.critical(f'Error extracting error log: {result.stderr}')
             raise SystemExit
@@ -152,9 +151,12 @@ class DatabaseExport:
             tf.write('BlackElo >= "2200"')
 
         pgn_file_2200_all = f'lichess2200all_{self.yyyy}{self.mm}.pgn'
-        cmd_text = f'pgn-extract -N -V -D -pl2 -t"{pgn_tag_name}" --quiet --fixresulttags --fixtagstrings --nosetuptags --output {pgn_file_2200_all} {self.pgn_file_updated_tc}'
-        logging.debug(cmd_text)
-        result = subprocess.run(cmd_text, cwd=self.download_path, capture_output=True, text=True)
+        cmd_list = [
+            'pgn-extract', '-N', '-V', ',-D', '-pl2', f'-t"{pgn_tag_name}"', '--quiet',
+            '--fixresulttags', '--fixtagstrings', '--nosetuptags',
+            '--output', pgn_file_2200_all, self.pgn_file_updated_tc
+        ]
+        result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
         if result.returncode != 0:
             logging.critical(f'Error extracting 2200 games: {result.stderr}')
             raise SystemExit
@@ -180,9 +182,12 @@ class DatabaseExport:
 
         minply = '6'
         pgn_file_corr_all_temp = f'lichess_correspondence_orig_{self.yyyy}{self.mm}.pgn'
-        cmd_text = f'pgn-extract -N -V -D -s -pl{minply} -t"{corr_tag_name}" --quiet --fixresulttags --fixtagstrings --nosetuptags -o{pgn_file_corr_all_temp} {self.pgn_file_updated_tc}'
-        logging.debug(cmd_text)
-        result = subprocess.run(cmd_text, cwd=self.download_path, capture_output=True, text=True)
+        cmd_list = [
+            'pgn-extract', '-N', '-V', '-D', '-s', f'-pl{minply}', f'-t"{corr_tag_name}"', '--quiet',
+            '--fixresulttags', '--fixtagstrings', '--nosetuptags',
+            '--output', pgn_file_corr_all_temp, self.pgn_file_updated_tc
+        ]
+        result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
         if result.returncode != 0:
             logging.critical(f'Error extracting correspondence games: {result.stderr}')
             raise SystemExit
@@ -320,9 +325,8 @@ class DatabaseExport:
         for file in self.timecontrol_files:
             if 'bullet' in file.lower() or 'blitz' in file.lower():
                 lim_name = os.path.splitext(file)[0] + f'_{limit}' + '.pgn'
-                cmd_text = f'pgn-extract --quiet --gamelimit {limit} --output {lim_name} {file}'
-                logging.debug(cmd_text)
-                result = subprocess.run(cmd_text, cwd=self.download_path, capture_output=True, text=True)
+                cmd_list = ['pgn-extract', '--quiet', '--gamelimit', limit, '--output', lim_name, file]
+                result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
                 if result.returncode != 0:
                     logging.critical(f'Error extracting partial bullet/blitz games: {result.stderr}')
                     raise SystemExit
@@ -483,17 +487,15 @@ class DatabaseExport:
 
             # filter min time control
             tmp_file = f'temp{tc_type}_{os.path.basename(input_file)}'
-            cmd_text = f'pgn-extract --quiet -t{tc_tag_file_min} --output {tmp_file} {os.path.basename(input_file)}'
-            logging.debug(cmd_text)
-            result = subprocess.run(cmd_text, cwd=os.path.dirname(input_file), capture_output=True, text=True)
+            cmd_list = ['pgn-extract', '--quiet', f'-t{tc_tag_file_min}', '--output', tmp_file, os.path.basename(input_file)]
+            result = subprocess.run(cmd_list, cwd=os.path.dirname(input_file), capture_output=True, text=True)
             if result.returncode != 0:
                 logging.critical(f'Error extracting minimum time control games: {result.stderr}')
                 raise SystemExit
 
             # filter max time control
-            cmd_text = f'pgn-extract --quiet -t{tc_tag_file_max} --output {new_tc_name} {tmp_file}'
-            logging.debug(cmd_text)
-            result = subprocess.run(cmd_text, cwd=os.path.dirname(input_file), capture_output=True, text=True)
+            cmd_list = ['pgn-extract', '--quiet', f'-t{tc_tag_file_max}', '--output', new_tc_name, tmp_file]
+            result = subprocess.run(cmd_list, cwd=os.path.dirname(input_file), capture_output=True, text=True)
             if result.returncode != 0:
                 logging.critical(f'Error extracting maximum time control games: {result.stderr}')
                 raise SystemExit
@@ -671,7 +673,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
     def _merge_files(self, file_path: str) -> str:
         merge_name = 'mergedgamefile.pgn'
         cmd_text = 'copy /B *.pgn ' + merge_name + ' >nul'
-        result = subprocess.run(cmd_text, cwd=file_path, capture_output=True, text=True)
+        result = subprocess.run(cmd_text, cwd=file_path, capture_output=True, text=True, shell=True)
         if result.returncode != 0:
             logging.critical(f'Error merging game files: {result.stderr}')
             raise SystemExit
@@ -721,9 +723,8 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
             tf.write('BlackElo >= "2200"')
 
         pgn_name = f'lichess2200all_{self.yyyy}{self.mm}.pgn'
-        cmd_text = f'pgn-extract -N -V -D -pl2 -t"{pgn_tag_file}" --quiet --fixresulttags --fixtagstrings --nosetuptags --output {pgn_name} {merge_name}'
-        logging.debug(cmd_text)
-        result = subprocess.run(cmd_text, cwd=temp_path, capture_output=True, text=True)
+        cmd_list = ['pgn-extract', '-N', '-V', '-D', '-pl2', f'-t"{pgn_tag_file}"', '--quiet', '--fixresulttags', '--fixtagstrings', '--nosetuptags', '--output', pgn_name, merge_name]
+        result = subprocess.run(cmd_list, cwd=temp_path, capture_output=True, text=True)
         if result.returncode != 0:
             logging.critical(f'Error extracting 2200 correspondence games: {result.stderr}')
             raise SystemExit
