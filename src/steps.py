@@ -152,7 +152,7 @@ class DatabaseExport:
 
         pgn_file_2200_all = f'lichess2200all_{self.yyyy}{self.mm}.pgn'
         cmd_list = [
-            'pgn-extract', '-N', '-V', ',-D', '-pl2', f'-t"{pgn_tag_name}"', '--quiet',
+            'pgn-extract', '-N', '-V', ',-D', '-pl2', f'-t{pgn_tag_name}', '--quiet',
             '--fixresulttags', '--fixtagstrings', '--nosetuptags',
             '--output', pgn_file_2200_all, self.pgn_file_updated_tc
         ]
@@ -183,7 +183,7 @@ class DatabaseExport:
         minply = '6'
         pgn_file_corr_all_temp = f'lichess_correspondence_orig_{self.yyyy}{self.mm}.pgn'
         cmd_list = [
-            'pgn-extract', '-N', '-V', '-D', '-s', f'-pl{minply}', f'-t"{corr_tag_name}"', '--quiet',
+            'pgn-extract', '-N', '-V', '-D', '-s', f'-pl{minply}', f'-t{corr_tag_name}', '--quiet',
             '--fixresulttags', '--fixtagstrings', '--nosetuptags',
             '--output', pgn_file_corr_all_temp, self.pgn_file_updated_tc
         ]
@@ -206,8 +206,7 @@ class DatabaseExport:
         conn = sql.connect(self.conn_str)
         csr = conn.cursor()
 
-        completed_file = f'{os.path.splitext(pgn_file_corr_all)[0]}_Completed.pgn'
-        self.pgn_file_corr_completed = os.path.join(self.download_path, completed_file)
+        self.pgn_file_corr_completed = f'{os.path.splitext(pgn_file_corr_all)[0]}_Completed.pgn'
         ctr = 0
         with open(os.path.join(self.download_path, pgn_file_corr_all), 'r', encoding='utf-8') as pgn:
             game_text = chess.pgn.read_game(pgn)
@@ -228,7 +227,7 @@ class DatabaseExport:
                         conn.commit()
                         ctr = ctr + 1
                 else:
-                    with open(self.pgn_file_corr_completed, 'a', encoding='utf-8') as f:
+                    with open(os.path.join(self.download_path, self.pgn_file_corr_completed), 'a', encoding='utf-8') as f:
                         f.write(str(game_text) + '\n\n')
 
                 game_text = chess.pgn.read_game(pgn)
@@ -236,8 +235,8 @@ class DatabaseExport:
         conn.close()
         qryengine.dispose()
 
-        self.timecontrol_files.append(completed_file)
-        self.files_to_keep.append(completed_file)
+        self.timecontrol_files.append(self.pgn_file_corr_completed)
+        self.files_to_keep.append(self.pgn_file_corr_completed)
         os.remove(os.path.join(self.download_path, pgn_file_corr_all))
 
         logging.info(f'Total of {ctr} ongoing correspondence games')
@@ -325,7 +324,7 @@ class DatabaseExport:
         for file in self.timecontrol_files:
             if 'bullet' in file.lower() or 'blitz' in file.lower():
                 lim_name = os.path.splitext(file)[0] + f'_{limit}' + '.pgn'
-                cmd_list = ['pgn-extract', '--quiet', '--gamelimit', limit, '--output', lim_name, file]
+                cmd_list = ['pgn-extract', '--quiet', '--gamelimit', str(limit), '--output', lim_name, file]
                 result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
                 if result.returncode != 0:
                     logging.critical(f'Error extracting partial bullet/blitz games: {result.stderr}')
@@ -340,7 +339,7 @@ class DatabaseExport:
             os.mkdir(temp_path)
 
         for file in self.analysis_files:
-            shutil.move(os.path.join(self.download_path, file), os.path.join(temp_path, file))
+            shutil.copy(os.path.join(self.download_path, file), os.path.join(temp_path, file))
 
         merge_name = self._merge_files(temp_path)
 
@@ -707,23 +706,22 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
 
         return sort_name
 
-    def _extract2200corr(self, file_path: str, temp_path: str, monthly_file: str, complete_file: str):
+    def _extract2200corr(self, file_path: str, temp_path: str, monthly_file: str, newlycomplete_file: str):
         shutil.copy(os.path.join(file_path, monthly_file), temp_path)
-        if complete_file is not None:
+        if newlycomplete_file is not None:
             # this would happen when no recently completed correspondence game were found
-            shutil.copy(os.path.join(file_path, complete_file), temp_path)
+            shutil.copy(os.path.join(file_path, newlycomplete_file), temp_path)
 
         merge_name = self._merge_files(temp_path)
 
         pgn_tag_name = 'LichessPgnTags.txt'
-        pgn_tag_file = os.path.join(temp_path, pgn_tag_name)
-        with open(pgn_tag_file, 'w') as tf:
+        with open(os.path.join(temp_path, pgn_tag_name), 'w') as tf:
             tf.write('WhiteElo >= "2200"')
             tf.write('\n')
             tf.write('BlackElo >= "2200"')
 
         pgn_name = f'lichess2200all_{self.yyyy}{self.mm}.pgn'
-        cmd_list = ['pgn-extract', '-N', '-V', '-D', '-pl2', f'-t"{pgn_tag_file}"', '--quiet', '--fixresulttags', '--fixtagstrings', '--nosetuptags', '--output', pgn_name, merge_name]
+        cmd_list = ['pgn-extract', '-N', '-V', '-D', '-pl2', f'-t{pgn_tag_name}', '--quiet', '--fixresulttags', '--fixtagstrings', '--nosetuptags', '--output', pgn_name, merge_name]
         result = subprocess.run(cmd_list, cwd=temp_path, capture_output=True, text=True)
         if result.returncode != 0:
             logging.critical(f'Error extracting 2200 correspondence games: {result.stderr}')
