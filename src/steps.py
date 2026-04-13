@@ -19,7 +19,7 @@ CONFIG_FILE = os.path.join(Path(__file__).parents[1], 'config.json')
 
 
 def files_to_process():
-    dloads = {}  # this will be a dictionary with the key being the .pgn file, and the value is the .zst
+    dloads = {}  # this will be a dictionary with the key being the .pgn file, and the value is the .zst URL
     dload_url = 'https://database.lichess.org/standard/list.txt'
     with requests.get(dload_url, stream=True) as resp:
         if resp.status_code != 200:
@@ -31,17 +31,16 @@ def files_to_process():
                 dloads[proc_name] = dload_name
 
     files_to_download = []
-    for f in dloads:
-        conn_str = os.getenv('ConnectionStringOdbcRelease')
-        conn = sql.connect(conn_str)
+    conn_str = os.getenv('ConnectionStringOdbcRelease')
+    with sql.connect(conn_str) as conn:
         csr = conn.cursor()
         qry = 'SELECT COUNT(Filename) FROM ChessWarehouse.dbo.LichessDatabase WHERE Filename = ?'
-        csr.execute(qry, f)
-        if csr.fetchone()[0] == 0:
-            files_to_download.append(dloads[f])
-        conn.close()
+        for f in dloads:
+            csr.execute(qry, f)
+            if csr.fetchone()[0] == 0:
+                files_to_download.append(dloads[f])
 
-    return sorted(files_to_download)
+    return sorted(files_to_download)  # list of .zst URL's
 
 
 class DatabaseExport:
@@ -108,10 +107,10 @@ class DatabaseExport:
         logging.info('Decompression started')
         self._write_log('Decompression_Start', 'GETDATE()')
 
-        cmd_list = ['zstd', '-d', self.archive_file, '-o', self.pgn_File]
+        cmd_list = ['zstd', '-d', self.archive_file, '-o', self.pgn_file]
         result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
         if result.returncode != 0:
-            logging.critical(f'Error extracting archive: {result.stderr}')
+            logging.critical(f'Error extracting archive: {result.stderr.strip()}')
             raise SystemExit
 
         self._write_log('Decompression_End', 'GETDATE()')
@@ -124,7 +123,7 @@ class DatabaseExport:
         cmd_list = ['pgn-extract', '--quiet', '-r', f'-l{error_file}', self.pgn_file]
         result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
         if result.returncode != 0:
-            logging.critical(f'Error extracting error log: {result.stderr}')
+            logging.critical(f'Error extracting error log: {result.stderr.strip()}')
             raise SystemExit
 
         if os.path.getsize(os.path.join(self.download_path, error_file)) > 0:
@@ -152,13 +151,13 @@ class DatabaseExport:
 
         pgn_file_2200_all = f'lichess2200all_{self.yyyy}{self.mm}.pgn'
         cmd_list = [
-            'pgn-extract', '-N', '-V', ',-D', '-pl2', f'-t{pgn_tag_name}', '--quiet',
+            'pgn-extract', '-N', '-V', '-D', '-pl2', f'-t{pgn_tag_name}', '--quiet',
             '--fixresulttags', '--fixtagstrings', '--nosetuptags',
             '--output', pgn_file_2200_all, self.pgn_file_updated_tc
         ]
         result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
         if result.returncode != 0:
-            logging.critical(f'Error extracting 2200 games: {result.stderr}')
+            logging.critical(f'Error extracting 2200 games: {result.stderr.strip()}')
             raise SystemExit
         os.remove(os.path.join(self.download_path, pgn_tag_name))
 
@@ -189,7 +188,7 @@ class DatabaseExport:
         ]
         result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
         if result.returncode != 0:
-            logging.critical(f'Error extracting correspondence games: {result.stderr}')
+            logging.critical(f'Error extracting correspondence games: {result.stderr.strip()}')
             raise SystemExit
         os.remove(os.path.join(self.download_path, corr_tag_name))
         os.remove(os.path.join(self.download_path, self.pgn_file_updated_tc))
@@ -327,7 +326,7 @@ class DatabaseExport:
                 cmd_list = ['pgn-extract', '--quiet', '--gamelimit', str(limit), '--output', lim_name, file]
                 result = subprocess.run(cmd_list, cwd=self.download_path, capture_output=True, text=True)
                 if result.returncode != 0:
-                    logging.critical(f'Error extracting partial bullet/blitz games: {result.stderr}')
+                    logging.critical(f'Error extracting partial bullet/blitz games: {result.stderr.strip()}')
                     raise SystemExit
                 self.files_to_keep.append(lim_name)
                 self.analysis_files.append(lim_name)
@@ -489,14 +488,14 @@ class DatabaseExport:
             cmd_list = ['pgn-extract', '--quiet', f'-t{tc_tag_file_min}', '--output', tmp_file, os.path.basename(input_file)]
             result = subprocess.run(cmd_list, cwd=os.path.dirname(input_file), capture_output=True, text=True)
             if result.returncode != 0:
-                logging.critical(f'Error extracting minimum time control games: {result.stderr}')
+                logging.critical(f'Error extracting minimum time control games: {result.stderr.strip()}')
                 raise SystemExit
 
             # filter max time control
             cmd_list = ['pgn-extract', '--quiet', f'-t{tc_tag_file_max}', '--output', new_tc_name, tmp_file]
             result = subprocess.run(cmd_list, cwd=os.path.dirname(input_file), capture_output=True, text=True)
             if result.returncode != 0:
-                logging.critical(f'Error extracting maximum time control games: {result.stderr}')
+                logging.critical(f'Error extracting maximum time control games: {result.stderr.strip()}')
                 raise SystemExit
 
             if tc_type in ['Rapid', 'Classical']:
@@ -674,7 +673,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
         cmd_text = 'copy /B *.pgn ' + merge_name + ' >nul'
         result = subprocess.run(cmd_text, cwd=file_path, capture_output=True, text=True, shell=True)
         if result.returncode != 0:
-            logging.critical(f'Error merging game files: {result.stderr}')
+            logging.critical(f'Error merging game files: {result.stderr.strip()}')
             raise SystemExit
 
         return merge_name
@@ -724,7 +723,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
         cmd_list = ['pgn-extract', '-N', '-V', '-D', '-pl2', f'-t{pgn_tag_name}', '--quiet', '--fixresulttags', '--fixtagstrings', '--nosetuptags', '--output', pgn_name, merge_name]
         result = subprocess.run(cmd_list, cwd=temp_path, capture_output=True, text=True)
         if result.returncode != 0:
-            logging.critical(f'Error extracting 2200 correspondence games: {result.stderr}')
+            logging.critical(f'Error extracting 2200 correspondence games: {result.stderr.strip()}')
             raise SystemExit
         os.remove(os.path.join(temp_path, pgn_tag_name))
 
@@ -760,7 +759,7 @@ OR (Inactive = 1 AND DATEDIFF(DAY, LastReviewed, GETDATE()) >= 90)
         cmd.extend([f for f in self.files_to_keep])  # add all files to compress
         result = subprocess.run(cmd, cwd=temp_path, capture_output=True, text=True)
         if result.returncode != 0:
-            logging.critical(f'Error archiving final results: {result.stderr}')
+            logging.critical(f'Error archiving final results: {result.stderr.strip()}')
             raise SystemExit
 
         # move new archive to expected directory
